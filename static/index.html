@@ -3,103 +3,343 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>P-StreamRec</title>
+  <title>P-StreamRec - Enregistreur Chaturbate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; background: #0b0e12; color: #e8eef6; }
-    .card { background: #121720; border: 1px solid #223046; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-    label { display:block; margin: 6px 0 4px; }
-    input[type=text], input[type=url] { width: 100%; padding: 8px; border: 1px solid #223046; border-radius: 6px; background:#0b0e12; color:#e8eef6; }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
-    button { background:#2a6df4; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; transition: all 0.2s; }
-    button:hover { background:#1e5de8; }
-    button.secondary { background:#1f2937; }
-    button.secondary:hover { background:#2d3748; }
-    button.danger { background:#ff6b6b; }
-    button.danger:hover { background:#ff5252; }
-    button.success { background:#10b981; }
-    .muted { color:#9bb0c9; }
-    .danger { color:#ff6b6b; }
-    .success { color:#10b981; }
-    .list { display:grid; gap:10px; }
-    video { width: 100%; max-height: 70vh; background:black; border-radius: 8px; }
-    small.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#9bb0c9; }
-    .status-indicator { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; }
-    .status-online { background:#10b981; animation: pulse 2s infinite; }
-    .status-offline { background:#6b7280; }
-    .status-recording { background:#ff6b6b; animation: pulse 1s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-    .quick-links { display: flex; gap: 8px; margin-top: 12px; }
-    .quick-link { background: #1f2937; padding: 6px 12px; border-radius: 6px; text-decoration: none; color: #9bb0c9; font-size: 14px; }
-    .quick-link:hover { background: #2d3748; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg-primary: #0a0e27;
+      --bg-secondary: #111432;
+      --bg-card: #1a1f3a;
+      --bg-card-hover: #232a4a;
+      --text-primary: #ffffff;
+      --text-secondary: #a0aec0;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --border: rgba(255, 255, 255, 0.1);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary) 0%, #0d1128 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    
+    /* Header */
+    .header {
+      background: rgba(17, 20, 50, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .logo:hover {
+      transform: scale(1.05);
+    }
+    
+    .add-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent) 0%, #a855f7 100%);
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .add-btn:hover {
+      transform: scale(1.1) rotate(90deg);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+    }
+    
+    /* Container */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    /* Models Grid */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    
+    .model-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    
+    .model-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow);
+      border-color: var(--accent);
+    }
+    
+    .model-thumbnail {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      background: linear-gradient(135deg, #1a1f3a 0%, #2d3356 100%);
+    }
+    
+    .model-info {
+      padding: 1.25rem;
+    }
+    
+    .model-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .model-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.online { background: var(--success); }
+    .status-dot.offline { background: #6b7280; animation: none; }
+    .status-dot.recording { background: var(--danger); }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+    }
+    
+    .badge.live { background: rgba(239, 68, 68, 0.9); }
+    .badge.recording { background: rgba(99, 102, 241, 0.9); }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      animation: slideUp 0.3s ease-out;
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .modal-header {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    
+    input[type="text"] {
+      width: 100%;
+      padding: 0.875rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: all 0.3s;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    button {
+      flex: 1;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, #a855f7 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+    
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+    }
+    
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+    }
+    
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+    
+    .empty-state h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
-  <h1>P-StreamRec</h1>
+  <header class="header">
+    <div class="logo" onclick="window.location.reload()">🎬 P-StreamRec</div>
+    <button class="add-btn" onclick="openAddModal()" title="Ajouter un modèle">+</button>
+  </header>
 
-  <div class="card">
-    <h3>🎥 Démarrer un enregistrement</h3>
-    <p class="muted" style="font-size: 14px;">
-      Entrez un nom d'utilisateur Chaturbate ou une URL m3u8 directe.
-      L'enregistrement démarre automatiquement dès que le stream est disponible.
-    </p>
-    <label for="target">URL m3u8 ou nom d'utilisateur Chaturbate</label>
-    <input id="target" type="text" placeholder="Ex: username ou https://...m3u8" />
-
-    <div class="row" style="margin-top:8px;">
-      <label><input type="radio" name="stype" value="auto" checked> 🔍 Auto-détection</label>
-      <label><input type="radio" name="stype" value="chaturbate"> 💜 Chaturbate</label>
-      <label><input type="radio" name="stype" value="m3u8"> 🔗 URL m3u8</label>
-    </div>
-
-    <div class="row" style="margin-top:12px;">
-      <input id="name" type="text" placeholder="Nom affiché (optionnel)" style="flex:1;" />
-      <input id="person" type="text" placeholder="Dossier d'enregistrement (optionnel)" style="flex:1;" />
+  <div class="container">
+    <div class="models-grid" id="modelsGrid">
+      <!-- Les cartes des modèles seront ajoutées ici par JavaScript -->
     </div>
     
-    <div class="row" style="margin-top:12px;">
-      <button onclick="startSession()" class="success">▶️ Démarrer l'enregistrement</button>
-      <button class="secondary" onclick="refreshStatus()">🔄 Rafraîchir</button>
-      <button class="secondary" onclick="showQuickAdd()">⚡ Ajout rapide</button>
-    </div>
-
-    <div class="quick-links" id="quickLinks" style="display:none;">
-      <span class="muted" style="font-size:12px;">Exemples rapides:</span>
-      <a href="#" class="quick-link" onclick="setQuickTarget('exemple_user'); return false;">exemple_user</a>
-      <a href="#" class="quick-link" onclick="setQuickTarget('autre_user'); return false;">autre_user</a>
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">🎬</div>
+      <h3>Aucun modèle ajouté</h3>
+      <p>Cliquez sur le bouton + pour ajouter un modèle Chaturbate</p>
     </div>
   </div>
 
-  <div class="card">
-    <h3>📺 Lecteur en direct</h3>
-    <video id="player" controls muted></video>
-    <div id="nowPlaying" class="muted" style="margin-top:8px;"></div>
-    <div class="row" style="margin-top:8px;">
-      <button onclick="player.play()" class="secondary">▶️ Play</button>
-      <button onclick="player.pause()" class="secondary">⏸️ Pause</button>
-      <button onclick="player.muted = !player.muted; this.textContent = player.muted ? '🔇 Unmute' : '🔊 Mute'" class="secondary">🔇 Unmute</button>
+  <!-- Modal pour ajouter un modèle -->
+  <div class="modal" id="addModal">
+    <div class="modal-content">
+      <h2 class="modal-header">Ajouter un modèle Chaturbate</h2>
+      <form onsubmit="addModel(event)">
+        <div class="form-group">
+          <label for="modelUrl">URL Chaturbate</label>
+          <input 
+            type="text" 
+            id="modelUrl" 
+            placeholder="https://chaturbate.com/username/" 
+            required
+          />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeAddModal()">Annuler</button>
+          <button type="submit" class="btn-primary">Ajouter</button>
+        </div>
+      </form>
     </div>
-  </div>
-
-  <div class="card">
-    <h3>📊 Sessions actives</h3>
-    <div class="row" style="margin-bottom:12px;">
-      <span id="sessionCount" class="muted">Chargement...</span>
-      <button onclick="stopAllSessions()" class="danger" style="margin-left:auto;">⏹️ Arrêter tout</button>
-    </div>
-    <div id="sessions" class="list"></div>
-  </div>
-
-  <div class="card" style="background: #0f172a;">
-    <h4>ℹ️ Informations système</h4>
-    <small class="code" style="line-height:1.6;">
-      📁 <b>Enregistrements:</b> <code>/data/records/&lt;person&gt;/YYYY-MM-DD.ts</code><br>
-      📺 <b>HLS streaming:</b> <code>/data/sessions/&lt;session_id&gt;/</code><br>
-      🔧 <b>Configuration:</b> CB_RESOLVER_ENABLED = <span id="cbStatus" class="success">actif</span><br>
-      💾 <b>Format:</b> MPEG-TS (compatible avec tous les lecteurs)<br>
-      🕐 <b>Rotation:</b> Automatique à minuit (nouveau fichier chaque jour)
-    </small>
   </div>
 </body>
 </html>

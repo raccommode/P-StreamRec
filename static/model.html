@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Modèle - P-StreamRec</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg-primary: #0a0e27;
+      --bg-secondary: #111432;
+      --bg-card: #1a1f3a;
+      --bg-card-hover: #232a4a;
+      --text-primary: #ffffff;
+      --text-secondary: #a0aec0;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --border: rgba(255, 255, 255, 0.1);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary) 0%, #0d1128 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    
+    /* Header */
+    .header {
+      background: rgba(17, 20, 50, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .back-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .back-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+    
+    .model-header {
+      flex: 1;
+    }
+    
+    .model-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .model-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.online { background: var(--success); }
+    .status-dot.offline { background: #6b7280; animation: none; }
+    .status-dot.recording { background: var(--danger); }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .action-btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-record {
+      background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    .btn-record:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+    
+    .btn-stop {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    
+    .btn-stop:hover {
+      background: var(--bg-card-hover);
+    }
+    
+    .btn-delete {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    
+    .btn-delete:hover {
+      background: var(--danger);
+      color: white;
+    }
+    
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    /* Video Player */
+    .video-container {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    video {
+      width: 100%;
+      max-height: 70vh;
+      border-radius: 12px;
+      background: #000;
+    }
+    
+    .video-controls {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .control-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: none;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 0.9rem;
+    }
+    
+    .control-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-primary);
+    }
+    
+    /* Recordings */
+    .recordings-section {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+    }
+    
+    .section-header {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .recordings-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+    
+    .recording-item {
+      background: var(--bg-secondary);
+      padding: 1rem;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+    
+    .recording-item:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+    
+    .recording-info {
+      flex: 1;
+    }
+    
+    .recording-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .recording-meta {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .recording-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: none;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+    
+    .icon-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .empty-message {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-secondary);
+    }
+    
+    .empty-message .icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+</head>
+<body>
+  <header class="header">
+    <button class="back-btn" onclick="window.location.href='/'">←</button>
+    <div class="model-header">
+      <div class="model-title" id="modelName">Chargement...</div>
+      <div class="model-subtitle">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Vérification...</span>
+      </div>
+    </div>
+    <button class="action-btn btn-record" id="recordBtn" onclick="toggleRecording()">
+      ⏺ Démarrer l'enregistrement
+    </button>
+    <button class="action-btn btn-delete" onclick="deleteModel()">
+      🗑️ Supprimer
+    </button>
+  </header>
+
+  <div class="container">
+    <div class="video-container">
+      <video id="player" controls></video>
+      <div class="video-controls">
+        <button class="control-btn" onclick="player.play()">▶️ Play</button>
+        <button class="control-btn" onclick="player.pause()">⏸️ Pause</button>
+        <button class="control-btn" onclick="player.muted = !player.muted">🔊 Son</button>
+        <button class="control-btn" onclick="player.requestFullscreen()">⛶ Plein écran</button>
+      </div>
+    </div>
+
+    <div class="recordings-section">
+      <div class="section-header">
+        <span>📁 Enregistrements</span>
+        <span class="recording-meta" id="recordingsCount">0 fichier</span>
+      </div>
+      <div class="recordings-list" id="recordingsList">
+        <!-- Les enregistrements seront ajoutés ici -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    let currentSession = null;
+    let hlsPlayer = null;
+
+    if (!username) {
+      window.location.href = '/';
+    }
+
+    // Initialisation
+    document.getElementById('modelName').textContent = username;
+
+    // Récupérer l'état du modèle
+    async function updateModelStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const sessions = await res.json();
+        const session = sessions.find(s => s.person === username);
+
+        if (session && session.running) {
+          currentSession = session;
+          document.getElementById('statusDot').className = 'status-dot recording';
+          document.getElementById('statusText').textContent = 'En enregistrement';
+          document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-stop';
+          
+          // Charger le stream
+          loadStream(session.playback_url);
+        } else {
+          currentSession = null;
+          document.getElementById('statusDot').className = 'status-dot offline';
+          document.getElementById('statusText').textContent = 'Hors ligne';
+          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-record';
+        }
+      } catch (e) {
+        console.error('Erreur statut:', e);
+      }
+    }
+
+    // Toggle enregistrement
+    async function toggleRecording() {
+      if (currentSession) {
+        // Arrêter
+        try {
+          const res = await fetch(`/api/stop/${currentSession.id}`, { method: 'POST' });
+          if (res.ok) {
+            showNotification('Enregistrement arrêté');
+            updateModelStatus();
+          }
+        } catch (e) {
+          showNotification('Erreur lors de l\'arrêt', 'error');
+        }
+      } else {
+        // Démarrer
+        try {
+          const res = await fetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target: username,
+              source_type: 'chaturbate',
+              person: username,
+              name: username
+            })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            showNotification('Enregistrement démarré!');
+            updateModelStatus();
+          } else {
+            const error = await res.json();
+            showNotification(error.detail || 'Erreur', 'error');
+          }
+        } catch (e) {
+          showNotification('Erreur lors du démarrage', 'error');
+        }
+      }
+    }
+
+    // Charger le stream
+    function loadStream(url) {
+      const video = document.getElementById('player');
+      
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+      } else if (window.Hls && window.Hls.isSupported()) {
+        if (hlsPlayer) {
+          hlsPlayer.destroy();
+        }
+        hlsPlayer = new Hls({ liveDurationInfinity: true });
+        hlsPlayer.loadSource(url);
+        hlsPlayer.attachMedia(video);
+      } else {
+        showNotification('HLS non supporté', 'error');
+      }
+    }
+
+    // Charger les enregistrements
+    async function loadRecordings() {
+      const list = document.getElementById('recordingsList');
+      const count = document.getElementById('recordingsCount');
+      
+      // TODO: Implémenter l'API pour lister les fichiers enregistrés
+      // Pour l'instant, afficher un message vide
+      list.innerHTML = `
+        <div class="empty-message">
+          <div class="icon">📂</div>
+          <p>Les enregistrements apparaîtront ici</p>
+          <p style="font-size: 0.85rem; margin-top: 0.5rem;">Chemin: /data/records/${username}/</p>
+        </div>
+      `;
+      count.textContent = '0 fichier';
+    }
+
+    // Supprimer le modèle
+    function deleteModel() {
+      if (!confirm(`Voulez-vous vraiment supprimer ${username} de votre liste ?`)) {
+        return;
+      }
+      
+      const models = JSON.parse(localStorage.getItem('chaturbate_models') || '[]');
+      const filtered = models.filter(m => m.username !== username);
+      localStorage.setItem('chaturbate_models', JSON.stringify(filtered));
+      
+      showNotification('Modèle supprimé');
+      setTimeout(() => window.location.href = '/', 1000);
+    }
+
+    // Notification
+    function showNotification(message, type = 'success') {
+      const notif = document.createElement('div');
+      const bgColor = type === 'success' ? '#10b981' : '#ef4444';
+      notif.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${bgColor};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        font-weight: 500;
+      `;
+      notif.textContent = message;
+      document.body.appendChild(notif);
+      setTimeout(() => notif.remove(), 3000);
+    }
+
+    // Initialisation
+    updateModelStatus();
+    loadRecordings();
+    
+    // Rafraîchir toutes les 5 secondes
+    setInterval(updateModelStatus, 5000);
+  </script>
+</body>
+</html>

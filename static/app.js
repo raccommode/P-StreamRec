@@ -1,127 +1,288 @@
-async function startSession() {
-  const target = document.getElementById('target').value.trim();
-  const name = document.getElementById('name').value.trim() || null;
-  const person = (document.getElementById('person')?.value || '').trim() || null;
-  if (!target) { alert('Veuillez saisir une URL m3u8 ou un nom.'); return; }
-  const stype = (document.querySelector('input[name="stype"]:checked')?.value || 'auto');
-  const source_type = stype === 'auto' ? null : stype;
+// ============================================
+// Gestion du LocalStorage pour les modèles
+// ============================================
 
-  const res = await fetch('/api/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target, source_type, name, person })
+function getModels() {
+  const models = localStorage.getItem('chaturbate_models');
+  return models ? JSON.parse(models) : [];
+}
+
+function saveModels(models) {
+  localStorage.setItem('chaturbate_models', JSON.stringify(models));
+}
+
+function extractUsername(url) {
+  // Extraire le username depuis une URL Chaturbate
+  const match = url.match(/chaturbate\.com\/([^\/\?]+)/);
+  return match ? match[1].toLowerCase() : url.toLowerCase();
+}
+
+// ============================================
+// Modal
+// ============================================
+
+function openAddModal() {
+  document.getElementById('addModal').classList.add('active');
+  document.getElementById('modelUrl').value = '';
+  document.getElementById('modelUrl').focus();
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('active');
+}
+
+// ============================================
+// Ajouter un modèle
+// ============================================
+
+async function addModel(event) {
+  event.preventDefault();
+  
+  const url = document.getElementById('modelUrl').value.trim();
+  const username = extractUsername(url);
+  
+  if (!username) {
+    showNotification('URL invalide', 'error');
+    return;
+  }
+  
+  const models = getModels();
+  
+  // Vérifier si le modèle existe déjà
+  if (models.find(m => m.username === username)) {
+    showNotification('Ce modèle est déjà dans la liste', 'error');
+    return;
+  }
+  
+  // Ajouter le modèle
+  models.push({
+    username: username,
+    addedAt: new Date().toISOString()
   });
-  if (!res.ok) {
-    const err = await res.json().catch(()=>({detail: res.statusText}));
-    alert('Erreur: ' + (err.detail || '')); return;
-  }
-  const data = await res.json();
-  attachPlayer(data.playback_url);
-  document.getElementById('nowPlaying').textContent = `Lecture: ${data.name} (session ${data.id})`;
-  refreshStatus();
-}
-
-async function refreshStatus() {
-  const res = await fetch('/api/status');
-  const sessions = await res.json();
-  const box = document.getElementById('sessions');
-  const counter = document.getElementById('sessionCount');
   
-  const runningSessions = sessions.filter(s => s.running).length;
-  counter.textContent = `${runningSessions} session(s) active(s) / ${sessions.length} total`;
-  
-  box.innerHTML = '';
-  sessions.forEach(s => {
-    const statusClass = s.running ? 'status-recording' : 'status-offline';
-    const statusText = s.running ? '🔴 En cours d\'enregistrement' : '⚫ Arrêté';
-    const div = document.createElement('div');
-    div.innerHTML = `
-      <div class="row" style="justify-content:space-between; padding: 12px; background: #0f172a; border-radius: 8px;">
-        <div>
-          <div><span class="status-indicator ${statusClass}"></span><b>${s.name}</b> <small class="muted">#${s.id}</small></div>
-          <div class="muted" style="margin-left:18px;">Dossier: <b>${s.person || '-'}</b></div>
-          <div class="muted" style="margin-left:18px;">${statusText}</div>
-          <div class="muted" style="margin-left:18px; font-size:12px;">Fichier: <code style="background:#1f2937; padding:2px 4px; border-radius:3px;">${s.record_path}</code></div>
-        </div>
-        <div class="row">
-          <button onclick="attachPlayer('${s.playback_url}')" class="secondary">📺 Regarder</button>
-          <button class="secondary" onclick="copyText('${location.origin + s.playback_url}')">📋 URL</button>
-          <button class="danger" onclick="stopSession('${s.id}')">⏹️ Stop</button>
-        </div>
-      </div>`;
-    box.appendChild(div);
-  })
+  saveModels(models);
+  closeAddModal();
+  showNotification(`${username} ajouté avec succès!`, 'success');
+  renderModels();
 }
 
-async function stopSession(id) {
-  const res = await fetch('/api/stop/' + id, { method: 'POST' });
-  if (!res.ok) { alert('Arrêt impossible'); return; }
-  refreshStatus();
-}
+// ============================================
+// Récupérer les informations d'un modèle
+// ============================================
 
-function attachPlayer(url) {
-  const video = document.getElementById('player');
-  if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = url; video.play();
-  } else if (window.Hls && window.Hls.isSupported()) {
-    if (video._hls) { video._hls.destroy(); }
-    const hls = new Hls({ liveDurationInfinity: true });
-    hls.loadSource(url); hls.attachMedia(video);
-    video._hls = hls;
-  } else {
-    alert('HLS non supporté par ce navigateur.');
+async function getModelInfo(username) {
+  try {
+    // Essayer de récupérer les infos depuis Chaturbate API
+    const response = await fetch(`https://chaturbate.com/api/chatvideocontext/${username}/`);
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        username: username,
+        thumbnail: data.room_image || `https://roomimg.stream.highwebmedia.com/ri/${username}.jpg`,
+        isOnline: data.room_status === 'public' || !!data.hls_source,
+        viewers: data.num_users || 0
+      };
+    }
+  } catch (e) {
+    console.error('Erreur API Chaturbate:', e);
   }
+  
+  // Fallback: utiliser l'image par défaut
+  return {
+    username: username,
+    thumbnail: `https://roomimg.stream.highwebmedia.com/ri/${username}.jpg`,
+    isOnline: false,
+    viewers: 0
+  };
 }
 
-async function copyText(text) {
-  try { 
-    await navigator.clipboard.writeText(text);
-    showNotification('URL copiée dans le presse-papier!');
-  } catch {}
+// ============================================
+// Afficher les modèles
+// ============================================
+
+async function renderModels() {
+  const models = getModels();
+  const grid = document.getElementById('modelsGrid');
+  const emptyState = document.getElementById('emptyState');
+  
+  if (models.length === 0) {
+    grid.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  
+  emptyState.style.display = 'none';
+  grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">Chargement des modèles...</p>';
+  
+  // Récupérer les sessions actives
+  const sessions = await getActiveSessions();
+  
+  // Charger les infos de chaque modèle
+  const modelsInfo = await Promise.all(
+    models.map(model => getModelInfo(model.username))
+  );
+  
+  grid.innerHTML = '';
+  
+  modelsInfo.forEach(model => {
+    const session = sessions.find(s => s.person === model.username);
+    const isRecording = session && session.running;
+    
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    card.onclick = () => openModelPage(model.username);
+    
+    card.innerHTML = `
+      ${isRecording ? '<div class="badge recording">REC</div>' : ''}
+      ${model.isOnline && !isRecording ? '<div class="badge live">LIVE</div>' : ''}
+      <img 
+        src="${model.thumbnail}" 
+        alt="${model.username}"
+        class="model-thumbnail"
+        onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
+      />
+      <div class="model-info">
+        <div class="model-name">${model.username}</div>
+        <div class="model-status">
+          <span class="status-dot ${isRecording ? 'recording' : model.isOnline ? 'online' : 'offline'}"></span>
+          ${isRecording ? 'En enregistrement' : model.isOnline ? 'En ligne' : 'Hors ligne'}
+          ${model.isOnline && model.viewers > 0 ? ` · ${model.viewers} viewers` : ''}
+        </div>
+      </div>
+    `;
+    
+    grid.appendChild(card);
+  });
 }
 
-function showNotification(message) {
+// ============================================
+// Récupérer les sessions actives
+// ============================================
+
+async function getActiveSessions() {
+  try {
+    const res = await fetch('/api/status');
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Erreur récupération sessions:', e);
+  }
+  return [];
+}
+
+// ============================================
+// Ouvrir la page d'un modèle
+// ============================================
+
+function openModelPage(username) {
+  // Créer une nouvelle page ou rediriger
+  window.location.href = `/model.html?username=${username}`;
+}
+
+// ============================================
+// Notifications
+// ============================================
+
+function showNotification(message, type = 'success') {
   const notif = document.createElement('div');
-  notif.style.cssText = 'position:fixed; top:20px; right:20px; background:#10b981; color:white; padding:12px 20px; border-radius:8px; z-index:9999; animation: slideIn 0.3s;';
+  const bgColor = type === 'success' ? '#10b981' : '#ef4444';
+  notif.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${bgColor};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
+    font-weight: 500;
+  `;
   notif.textContent = message;
   document.body.appendChild(notif);
-  setTimeout(() => notif.remove(), 3000);
-}
-
-function setQuickTarget(username) {
-  document.getElementById('target').value = username;
-  document.querySelector('input[name="stype"][value="chaturbate"]').checked = true;
-}
-
-function showQuickAdd() {
-  const links = document.getElementById('quickLinks');
-  links.style.display = links.style.display === 'none' ? 'flex' : 'none';
-}
-
-async function stopAllSessions() {
-  if (!confirm('Voulez-vous vraiment arrêter tous les enregistrements?')) return;
-  const res = await fetch('/api/status');
-  const sessions = await res.json();
-  const running = sessions.filter(s => s.running);
   
-  for (const session of running) {
-    await fetch('/api/stop/' + session.id, { method: 'POST' });
+  setTimeout(() => {
+    notif.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => notif.remove(), 300);
+  }, 3000);
+}
+
+// ============================================
+// Démarrage automatique des enregistrements
+// ============================================
+
+async function checkAndStartRecordings() {
+  const models = getModels();
+  const sessions = await getActiveSessions();
+  
+  for (const model of models) {
+    const username = model.username;
+    const session = sessions.find(s => s.person === username);
+    const isRecording = session && session.running;
+    
+    if (!isRecording) {
+      // Vérifier si le modèle est en ligne
+      const info = await getModelInfo(username);
+      if (info.isOnline) {
+        // Démarrer l'enregistrement automatiquement
+        try {
+          const res = await fetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target: username,
+              source_type: 'chaturbate',
+              person: username,
+              name: username
+            })
+          });
+          
+          if (res.ok) {
+            console.log(`✅ Enregistrement démarré pour ${username}`);
+          }
+        } catch (e) {
+          console.error(`❌ Erreur démarrage ${username}:`, e);
+        }
+      }
+    }
   }
-  
-  showNotification(`${running.length} session(s) arrêtée(s)`);
-  refreshStatus();
 }
 
-// Auto-refresh toutes les 5 secondes
-setInterval(refreshStatus, 5000);
+// ============================================
+// Initialisation
+// ============================================
 
 window.addEventListener('DOMContentLoaded', () => {
-  refreshStatus();
-  
-  // Ajouter le style des animations
+  // Ajouter les styles d'animation
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
   `;
   document.head.appendChild(style);
+  
+  // Afficher les modèles
+  renderModels();
+  
+  // Rafraîchir toutes les 10 secondes
+  setInterval(renderModels, 10000);
+  
+  // Vérifier et démarrer les enregistrements toutes les 30 secondes
+  setInterval(checkAndStartRecordings, 30000);
+  checkAndStartRecordings(); // Premier check immédiat
+  
+  // Fermer la modal en cliquant en dehors
+  document.getElementById('addModal').addEventListener('click', (e) => {
+    if (e.target.id === 'addModal') {
+      closeAddModal();
+    }
+  });
 });
