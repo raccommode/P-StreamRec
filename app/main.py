@@ -290,3 +290,31 @@ async def get_thumbnail(username: str):
             media_type="image/svg+xml",
             headers={"Cache-Control": "public, max-age=60"}
         )
+
+
+@app.get("/api/recordings/{username}")
+async def list_recordings(username: str):
+    """Liste les enregistrements disponibles pour un modèle"""
+    import glob
+    import os
+    from datetime import datetime
+    
+    records_dir = OUTPUT_DIR / "records" / username
+    
+    if not records_dir.exists():
+        return {"recordings": []}
+    
+    # Trouver tous les fichiers .ts
+    recordings = []
+    for ts_file in sorted(records_dir.glob("*.ts"), reverse=True):
+        stat = ts_file.stat()
+        recordings.append({
+            "filename": ts_file.name,
+            "date": ts_file.stem,  # Le nom du fichier est la date (YYYY-MM-DD.ts)
+            "size": stat.st_size,
+            "size_mb": round(stat.st_size / 1024 / 1024, 2),
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "url": f"/streams/records/{username}/{ts_file.name}"
+        })
+    
+    return {"recordings": recordings}

@@ -186,10 +186,47 @@
       transition: all 0.3s;
       font-size: 0.9rem;
     }
-    
     .control-btn:hover {
       background: var(--bg-card-hover);
       color: var(--text-primary);
+    }
+    
+    /* Onglets */
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+    
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+    }
+    
+    .tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
     }
     
     /* Recordings */
@@ -212,6 +249,60 @@
     .recordings-list {
       display: grid;
       gap: 0.75rem;
+    }
+    
+    .recording-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .recording-item:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    
+    .recording-info {
+      flex: 1;
+    }
+    
+    .recording-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+    
+    .recording-meta {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .play-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .play-btn:hover {
+      background: var(--accent-hover);
+      transform: scale(1.1);
     }
     
     .recording-item {
@@ -301,26 +392,33 @@
   </header>
 
   <div class="container">
-    <div class="player-container">
-      <video id="player" class="video-player" controls muted autoplay></video>
-      <div class="empty-message">
-        <div class="icon">📺</div>
-        <p>Aucun stream en cours</p>
+    <!-- Onglets -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('live')">📺 Live</button>
+      <button class="tab-btn" onclick="switchTab('recordings')">📁 Rediffusions</button>
+    </div>
+
+    <!-- Contenu Live -->
+    <div id="tab-live" class="tab-content active">
+      <div class="player-container">
+        <video id="player" class="video-player" controls muted autoplay></video>
+        <div class="empty-message">
+          <div class="icon">📺</div>
+          <p>Aucun stream en cours</p>
+        </div>
       </div>
     </div>
-    <div class="video-controls">
-      <button class="control-btn" onclick="player.play()">▶️ Play</button>
-      <button class="control-btn" onclick="player.pause()">⏸️ Pause</button>
-      <button class="control-btn" onclick="player.muted = !player.muted">🔊 Son</button>
-      <button class="control-btn" onclick="player.requestFullscreen()">⛶ Plein écran</button>
 
-    <div class="recordings-section">
-      <div class="section-header">
-        <span>📁 Enregistrements</span>
-        <span class="recording-meta" id="recordingsCount">0 fichier</span>
-      </div>
-      <div class="recordings-list" id="recordingsList">
-        <!-- Les enregistrements seront ajoutés ici -->
+    <!-- Contenu Rediffusions -->
+    <div id="tab-recordings" class="tab-content">
+      <div class="recordings-section">
+        <div class="section-header">
+          <span>📁 Enregistrements disponibles</span>
+          <span class="recording-meta" id="recordingsCount">0 fichier</span>
+        </div>
+        <div class="recordings-list" id="recordingsList">
+          <!-- Les enregistrements seront ajoutés ici -->
+        </div>
       </div>
     </div>
   </div>
@@ -544,16 +642,78 @@
       const list = document.getElementById('recordingsList');
       const count = document.getElementById('recordingsCount');
       
-      // TODO: Implémenter l'API pour lister les fichiers enregistrés
-      // Pour l'instant, afficher un message vide
-      list.innerHTML = `
-        <div class="empty-message">
-          <div class="icon">📂</div>
-          <p>Les enregistrements apparaîtront ici</p>
-          <p style="font-size: 0.85rem; margin-top: 0.5rem;">Chemin: /data/records/${username}/</p>
-        </div>
-      `;
-      count.textContent = '0 fichier';
+      try {
+        const res = await fetch(`/api/recordings/${username}`);
+        const data = await res.json();
+        
+        if (data.recordings && data.recordings.length > 0) {
+          count.textContent = `${data.recordings.length} fichier${data.recordings.length > 1 ? 's' : ''}`;
+          
+          list.innerHTML = data.recordings.map(rec => `
+            <div class="recording-item" onclick="playRecording('${rec.url}')">
+              <div class="recording-info">
+                <div class="recording-title">📹 ${rec.date}</div>
+                <div class="recording-meta">${rec.size_mb} MB</div>
+              </div>
+              <button class="play-btn">▶️</button>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = `
+            <div class="empty-message">
+              <div class="icon">📂</div>
+              <p>Aucun enregistrement disponible</p>
+              <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Les enregistrements apparaîtront ici</p>
+            </div>
+          `;
+          count.textContent = '0 fichier';
+        }
+      } catch (e) {
+        console.error('Erreur chargement enregistrements:', e);
+        list.innerHTML = `
+          <div class="empty-message">
+            <div class="icon">⚠️</div>
+            <p>Erreur de chargement</p>
+          </div>
+        `;
+      }
+    }
+    
+    // Lire un enregistrement
+    function playRecording(url) {
+      console.log('📹 Lecture enregistrement:', url);
+      const video = document.getElementById('player');
+      
+      // Arrêter le lecteur HLS si actif
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+      
+      // Charger la vidéo directement
+      video.src = url;
+      video.play();
+      
+      // Retourner à l'onglet Live pour voir le lecteur
+      switchTab('live');
+      
+      showNotification('Lecture de l\'enregistrement...', 'info');
+    }
+
+    // Switch entre onglets
+    function switchTab(tabName) {
+      // Gérer les boutons
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // Gérer le contenu
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      
+      // Si onglet recordings, charger la liste
+      if (tabName === 'recordings') {
+        loadRecordings();
+      }
     }
 
     // Supprimer le modèle

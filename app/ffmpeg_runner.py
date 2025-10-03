@@ -119,8 +119,12 @@ class FFmpegManager:
 
             cmd = [
                 self.ffmpeg_path,
-                "-nostdin", "-hide_banner", "-loglevel", "error",
+                "-nostdin", "-hide_banner", "-loglevel", "warning",
                 "-y",
+                # Options de reconnexion pour stabilité
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10",
                 "-i", sess.input_url,
                 "-map", "0",
                 "-c", "copy",
