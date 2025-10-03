@@ -191,6 +191,47 @@
       pointer-events: none;
     }
     
+    .quality-selector {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .quality-selector label {
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    
+    .quality-selector select {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    
+    .quality-selector select:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+    
+    .quality-selector select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    
     .control-btn {
       padding: 0.5rem 1rem;
       border-radius: 8px;
@@ -467,6 +508,12 @@
     <div id="tab-live" class="tab-content active">
       <div class="player-container">
         <video id="player" class="video-player" controls muted autoplay></video>
+        <div class="quality-selector" id="qualitySelector" style="display: none;">
+          <label for="qualitySelect">Qualité :</label>
+          <select id="qualitySelect" onchange="changeQuality(this.value)">
+            <option value="-1">Auto</option>
+          </select>
+        </div>
         <div class="empty-message">
           <div class="icon">📺</div>
           <p>Aucun stream en cours</p>
@@ -686,6 +733,12 @@
         
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('✅ Manifest chargé, démarrage lecture...');
+          
+          // Afficher le sélecteur de qualité si plusieurs niveaux disponibles
+          if (hlsPlayer.levels.length > 1) {
+            updateQualitySelector();
+          }
+          
           // Son coupé pour autoplay
           video.muted = true;
           // Démarrer automatiquement
@@ -702,9 +755,68 @@
           console.log('✅ Niveau chargé:', data.level, 'Segments:', data.details.fragments.length);
         });
         
+        hlsPlayer.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+          console.log('🎚️ Qualité changée:', data.level);
+          updateQualitySelector();
+        });
+        
       } else {
         console.error('HLS non supporté par ce navigateur');
         showNotification('HLS non supporté', 'error');
+      }
+    }
+
+    // Mettre à jour le sélecteur de qualité
+    function updateQualitySelector() {
+      if (!hlsPlayer || hlsPlayer.levels.length <= 1) {
+        document.getElementById('qualitySelector').style.display = 'none';
+        return;
+      }
+      
+      const selector = document.getElementById('qualitySelector');
+      const select = document.getElementById('qualitySelect');
+      
+      // Vider les options
+      select.innerHTML = '<option value="-1">Auto</option>';
+      
+      // Ajouter toutes les qualités disponibles
+      hlsPlayer.levels.forEach((level, index) => {
+        const height = level.height;
+        const bitrate = Math.round(level.bitrate / 1000);
+        const label = height ? `${height}p (${bitrate} kbps)` : `${bitrate} kbps`;
+        
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = label;
+        
+        if (hlsPlayer.currentLevel === index) {
+          option.selected = true;
+        }
+        
+        select.appendChild(option);
+      });
+      
+      // Afficher le sélecteur
+      selector.style.display = 'flex';
+      
+      console.log(`🎚️ ${hlsPlayer.levels.length} qualités disponibles`);
+    }
+    
+    // Changer la qualité
+    function changeQuality(levelIndex) {
+      if (!hlsPlayer) return;
+      
+      const level = parseInt(levelIndex);
+      hlsPlayer.currentLevel = level;
+      
+      if (level === -1) {
+        console.log('🎚️ Mode Auto activé');
+        showNotification('Qualité: Auto', 'info');
+      } else {
+        const selectedLevel = hlsPlayer.levels[level];
+        const label = selectedLevel.height ? `${selectedLevel.height}p` : `${Math.round(selectedLevel.bitrate / 1000)} kbps`;
+        console.log(`🎚️ Qualité sélectionnée: ${label}`);
+        showNotification(`Qualité: ${label}`, 'info');
       }
     }
 
