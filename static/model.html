@@ -417,6 +417,10 @@
             const data = await res.json();
             showNotification('Enregistrement démarré!');
             updateModelStatus();
+          } else if (res.status === 409) {
+            // Session déjà en cours, charger le stream quand même
+            console.log('⏭️ Session déjà en cours, chargement du stream...');
+            await updateModelStatus();
           } else {
             const error = await res.json();
             showNotification(error.detail || 'Erreur', 'error');
@@ -601,6 +605,10 @@
           if (!existingSession) {
             console.log(`🎬 Démarrage automatique de l'enregistrement pour ${username}`);
             await toggleRecording();
+          } else {
+            console.log(`⏭️ Session déjà en cours pour ${username}, chargement du stream...`);
+            // La session existe déjà, on va juste charger le stream
+            await updateModelStatus();
           }
         }
       } catch (e) {

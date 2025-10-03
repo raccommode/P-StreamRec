@@ -278,6 +278,9 @@ async function checkAndStartRecordings() {
             console.log(`✅ Enregistrement démarré automatiquement pour ${username}`);
             // Rafraîchir immédiatement pour voir le changement
             await renderModels();
+          } else if (res.status === 409) {
+            // Session déjà en cours, c'est normal, on ignore
+            console.log(`⏭️ Session déjà en cours pour ${username}, skip`);
           } else {
             const error = await res.json();
             console.error(`❌ Erreur pour ${username}:`, error.detail);
