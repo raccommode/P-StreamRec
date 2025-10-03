@@ -74,6 +74,19 @@ def resolve_m3u8(username: str) -> str:
                 # Nettoyer l'URL
                 m3u8_url = m3u8_url.replace("\\/", "/").replace("\\", "")
                 
+                # Décoder les entités Unicode (u002D = -, u0022 = ", etc.)
+                import html
+                m3u8_url = html.unescape(m3u8_url)
+                
+                # Remplacer les codes Unicode hexadécimaux
+                import re as regex_module
+                def decode_unicode(match):
+                    return chr(int(match.group(1), 16))
+                m3u8_url = regex_module.sub(r'u([0-9a-fA-F]{4})', decode_unicode, m3u8_url)
+                
+                # Supprimer les caractères parasites à la fin
+                m3u8_url = m3u8_url.rstrip('",;: \t\n\r')
+                
                 print(f"   🎯 M3U8 candidat: {m3u8_url}")
                 
                 if m3u8_url.startswith("http") and ".m3u8" in m3u8_url:
