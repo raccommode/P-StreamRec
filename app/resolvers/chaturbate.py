@@ -39,24 +39,40 @@ def resolve_m3u8(username: str) -> str:
         html = resp.text
         print(f"📄 Page HTML récupérée ({len(html)} caractères)")
         
-        # Chercher le M3U8 avec regex simple
+        # Chercher le M3U8 avec patterns multiples et variés
         m3u8_patterns = [
-            r'"(https://[^"]*\.m3u8[^"]*)"',
-            r"'(https://[^']*\.m3u8[^']*)'",
-            r'hls_source["\s:]+(["\'])(https://[^"\']+\.m3u8[^"\']*)\1',
+            # URLs directes entre guillemets
+            r'"(https?://[^"]*\.m3u8[^"]*)"',
+            r"'(https?://[^']*\.m3u8[^']*)'",
+            # Dans variables JavaScript
+            r'hls_source["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',
+            r'hlsSource["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',
+            r'm3u8["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',
+            # URL encodée (avec antislash)
+            r'(https?:\\?/\\?/[^"\'\\s]+\.m3u8[^"\'\\s]*)',
+            # Dans JSON
+            r'"url"["\s:]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',
+            # Pattern large pour tout .m3u8
+            r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',
         ]
         
         print(f"🔎 Recherche du M3U8 avec {len(m3u8_patterns)} patterns...")
         
         for i, pattern in enumerate(m3u8_patterns, 1):
-            print(f"   Pattern {i}/{len(m3u8_patterns)}: {pattern[:50]}...")
-            matches = re.findall(pattern, html)
+            print(f"   Pattern {i}/{len(m3u8_patterns)}: {pattern[:60]}...")
+            matches = re.findall(pattern, html, re.IGNORECASE)
             
             if matches:
                 print(f"   ✅ {len(matches)} match(es) trouvé(s) avec pattern {i}")
                 # Prendre le premier match (ou le groupe capturé)
-                m3u8_url = matches[0] if isinstance(matches[0], str) else matches[0][-1]
-                m3u8_url = m3u8_url.replace("\\/", "/")
+                if isinstance(matches[0], tuple):
+                    # Si c'est un tuple (groupes capturés), prendre le dernier élément non vide
+                    m3u8_url = [g for g in matches[0] if g and 'http' in g][0] if matches[0] else matches[0][-1]
+                else:
+                    m3u8_url = matches[0]
+                
+                # Nettoyer l'URL
+                m3u8_url = m3u8_url.replace("\\/", "/").replace("\\", "")
                 
                 print(f"   🎯 M3U8 candidat: {m3u8_url}")
                 
@@ -80,10 +96,23 @@ def resolve_m3u8(username: str) -> str:
         # Debug: afficher un extrait du HTML
         print(f"\n📋 Extrait HTML (premiers 500 chars):")
         print(html[:500])
-        print(f"\n📋 Recherche 'hls' dans HTML:")
-        hls_occurrences = [i for i in range(len(html)) if html.startswith('hls', i)][:5]
-        for idx in hls_occurrences:
-            print(f"   Position {idx}: {html[idx:idx+100]}")
+        print(f"\n📋 Recherche 'hls' dans HTML (case-insensitive):")
+        html_lower = html.lower()
+        hls_occurrences = [i for i in range(len(html_lower)) if html_lower.startswith('hls', i)][:10]
+        if hls_occurrences:
+            for idx in hls_occurrences:
+                print(f"   Position {idx}: ...{html[max(0,idx-20):idx+150]}...")
+        else:
+            print(f"   ❌ Aucune occurrence de 'hls' trouvée")
+        
+        # Chercher aussi 'm3u8' directement
+        print(f"\n📋 Recherche 'm3u8' dans HTML:")
+        m3u8_occurrences = [i for i in range(len(html_lower)) if html_lower.startswith('m3u8', i)][:5]
+        if m3u8_occurrences:
+            for idx in m3u8_occurrences:
+                print(f"   Position {idx}: ...{html[max(0,idx-50):idx+100]}...")
+        else:
+            print(f"   ❌ Aucune occurrence de 'm3u8' trouvée")
         
         print(f"\n❌ M3U8 non trouvé")
         raise ResolveError(f"Impossible de trouver le flux M3U8 pour {username}")
