@@ -427,10 +427,34 @@
       }
     }
 
-    // Charger le stream
-    function loadStream(url) {
+    // Charger le stream avec retry si le manifest n'est pas encore prêt
+    async function loadStream(url) {
       console.log('🎬 Chargement du stream:', url);
       const video = document.getElementById('player');
+      
+      // Attendre que le manifest soit disponible (max 10 tentatives)
+      let retries = 10;
+      while (retries > 0) {
+        try {
+          const checkResponse = await fetch(url, { method: 'HEAD' });
+          if (checkResponse.ok) {
+            console.log('✅ Manifest disponible');
+            break;
+          }
+        } catch (e) {
+          console.log(`⏳ Manifest pas encore disponible, attente... (${retries} tentatives restantes)`);
+        }
+        retries--;
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
+        }
+      }
+      
+      if (retries === 0) {
+        console.error('❌ Manifest toujours indisponible après 10 secondes');
+        showNotification('Stream non disponible, réessayez dans quelques secondes', 'error');
+        return;
+      }
       
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         console.log('📱 Utilisation du lecteur natif');
