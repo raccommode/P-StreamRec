@@ -86,10 +86,18 @@ async def api_start(body: StartBody):
             try:
                 from .resolvers.chaturbate import resolve_m3u8 as resolve_chaturbate
                 m3u8_url = resolve_chaturbate(target)
+                if not m3u8_url:
+                    raise HTTPException(status_code=400, detail=f"Impossible de trouver le flux pour {target}")
                 if not person:
                     person = target  # username
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Échec de résolution Chaturbate: {e}")
+                import traceback
+                error_detail = f"Échec résolution Chaturbate pour {target}: {str(e)}"
+                print(f"ERROR: {error_detail}")
+                print(traceback.format_exc())
+                raise HTTPException(status_code=400, detail=error_detail)
         else:
             raise HTTPException(status_code=400, detail="source_type invalide. Utilisez 'm3u8' ou 'chaturbate'.")
 
@@ -187,56 +195,51 @@ async def get_model_status(username: str):
 @app.get("/api/thumbnail/{username}")
 async def get_thumbnail(username: str):
     """Proxy pour récupérer les miniatures Chaturbate"""
+    import requests
+    from fastapi.responses import Response
+    
     try:
-        import requests
-        from fastapi.responses import Response
-        
-        # Essayer d'abord l'API pour obtenir l'URL de l'image
-        api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-        }
-        
-        try:
-            api_response = requests.get(api_url, headers=headers, timeout=5)
-            if api_response.status_code == 200:
-                data = api_response.json()
-                img_url = (
-                    data.get("room_image") or 
-                    data.get("room_img") or
-                    data.get("image_url") or
-                    f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
-                )
-            else:
-                img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
-        except:
-            img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
-        
-        # S'assurer que l'URL est complète
-        if img_url.startswith("//"):
-            img_url = "https:" + img_url
+        # URL directe de l'image Chaturbate
+        img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
         
         # Récupérer l'image
-        img_headers = {
+        headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Referer": "https://chaturbate.com/",
         }
         
-        img_response = requests.get(img_url, headers=img_headers, timeout=10)
+        response = requests.get(img_url, headers=headers, timeout=5, allow_redirects=True)
         
-        if img_response.status_code == 200:
+        if response.status_code == 200:
             return Response(
-                content=img_response.content,
-                media_type=img_response.headers.get("content-type", "image/jpeg"),
+                content=response.content,
+                media_type="image/jpeg",
                 headers={
-                    "Cache-Control": "public, max-age=300",  # Cache 5 minutes
+                    "Cache-Control": "public, max-age=600",
                 }
             )
-        else:
-            # Retourner une image placeholder
-            raise HTTPException(status_code=404, detail="Image non trouvée")
+        
+        # Si erreur, retourner image par défaut (SVG placeholder)
+        svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
+            <rect fill="#1a1f3a" width="280" height="200"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#a0aec0" font-family="system-ui" font-size="16">{username}</text>
+        </svg>'''
+        
+        return Response(
+            content=svg_placeholder,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=60"}
+        )
             
     except Exception as e:
-        # Image placeholder en cas d'erreur
-        raise HTTPException(status_code=404, detail=str(e))
+        # SVG placeholder en cas d'erreur
+        svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
+            <rect fill="#1a1f3a" width="280" height="200"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#a0aec0" font-family="system-ui" font-size="16">{username}</text>
+        </svg>'''
+        
+        return Response(
+            content=svg_placeholder,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=60"}
+        )
