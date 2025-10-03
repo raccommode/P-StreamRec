@@ -471,14 +471,8 @@
           hlsPlayer.destroy();
         }
         hlsPlayer = new Hls({ 
-          liveDurationInfinity: true,
-          enableWorker: true,
-          lowLatencyMode: true,
           debug: false,
-          // Toujours sélectionner la meilleure qualité disponible
-          startLevel: -1,  // -1 = auto-select (choisit la meilleure)
-          capLevelToPlayerSize: false,  // Ne pas limiter la qualité à la taille du lecteur
-          maxMaxBufferLength: 600,  // Buffer plus long pour éviter les coupures
+          enableWorker: false,
         });
         
         // Gestion des erreurs HLS
