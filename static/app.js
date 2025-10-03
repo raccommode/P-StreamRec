@@ -154,8 +154,16 @@ async function renderModels() {
     const session = sessions.find(s => s.person === model.username);
     const isRecording = session && session.running;
     
+    // Déterminer la classe de statut
+    let statusClass = 'offline';
+    if (isRecording) {
+      statusClass = 'recording';
+    } else if (model.isOnline) {
+      statusClass = 'online';
+    }
+    
     const card = document.createElement('div');
-    card.className = 'model-card';
+    card.className = `model-card ${statusClass}`;
     card.onclick = () => openModelPage(model.username);
     
     card.innerHTML = `

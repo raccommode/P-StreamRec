@@ -58,7 +58,6 @@ def resolve_m3u8(username: str) -> str:
                 data = resp.json()
             except ValueError:
                 # Essayer de parser le contenu HTML si ce n'est pas du JSON
-                import re
                 match = re.search(r'"hls_source"\s*:\s*"([^"]+)"', resp.text)
                 if match:
                     m3u8_url = match.group(1).replace("\\/", "/")

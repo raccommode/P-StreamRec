@@ -146,6 +146,16 @@
       height: 200px;
       object-fit: cover;
       background: linear-gradient(135deg, #1a1f3a 0%, #2d3356 100%);
+      transition: filter 0.3s ease;
+    }
+    
+    .model-card.offline .model-thumbnail {
+      filter: grayscale(100%) brightness(0.6);
+    }
+    
+    .model-card.online .model-thumbnail,
+    .model-card.recording .model-thumbnail {
+      filter: none;
     }
     
     .model-info {

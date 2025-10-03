@@ -154,10 +154,23 @@ async def get_model_status(username: str):
         
         if response.status_code == 200:
             data = response.json()
+            
+            # Essayer différentes sources pour la miniature
+            thumbnail = (
+                data.get("room_image") or 
+                data.get("room_img") or
+                data.get("image_url") or
+                f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
+            )
+            
+            # S'assurer que l'URL est complète
+            if thumbnail.startswith("//"):
+                thumbnail = "https:" + thumbnail
+            
             return {
                 "username": username,
                 "isOnline": data.get("room_status") == "public" or bool(data.get("hls_source")),
-                "thumbnail": data.get("room_image") or f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+                "thumbnail": thumbnail,
                 "viewers": data.get("num_users", 0)
             }
         else:
