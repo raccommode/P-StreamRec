@@ -112,44 +112,13 @@ async function renderModels() {
   }
   
   emptyState.style.display = 'none';
-  
-  // Ne pas afficher "Chargement..." si la grille a déjà du contenu
-  if (grid.children.length === 0) {
-    grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">Chargement des modèles...</p>';
-  }
+  grid.innerHTML = '';
   
   // Récupérer les sessions actives
   const sessions = await getActiveSessions();
   
-  // Charger les infos de chaque modèle
-  const modelsInfo = await Promise.all(
-    models.map(async (model) => {
-      const info = await getModelInfo(model.username);
-      return {
-        ...info,
-        addedAt: model.addedAt
-      };
-    })
-  );
-  
-  // Trier les modèles : Live en premier, puis par date de dernière diffusion
-  modelsInfo.sort((a, b) => {
-    // Les en enregistrement en premier
-    const aRecording = sessions.find(s => s.person === a.username && s.running);
-    const bRecording = sessions.find(s => s.person === b.username && s.running);
-    if (aRecording && !bRecording) return -1;
-    if (!aRecording && bRecording) return 1;
-    
-    // Puis les lives
-    if (a.isOnline && !b.isOnline) return -1;
-    if (!a.isOnline && b.isOnline) return 1;
-    
-    // Puis par date d'ajout (plus récent en premier)
-  });
-  
-  grid.innerHTML = '';
-  
-  for (const model of modelsInfo) {
+  // Créer les cartes une par une
+  for (const model of models) {
     const modelInfo = await getModelInfo(model.username);
     model.isOnline = modelInfo.isOnline;
     model.thumbnail = modelInfo.thumbnail;
@@ -164,7 +133,7 @@ async function renderModels() {
         const recData = await recRes.json();
         recordingsCount = recData.recordings?.length || 0;
         if (recData.recordings && recData.recordings.length > 0) {
-          lastRecording = recData.recordings[0].date; // Le plus récent
+          lastRecording = recData.recordings[0].date;
         }
       }
     } catch (e) {
@@ -340,59 +309,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Afficher les modèles
   renderModels();
   
-  // Rafraîchir uniquement les statuts toutes les 15 secondes (optimisé)
-  setInterval(async () => {
-    const sessions = await getActiveSessions();
-    const models = getModels();
-    
-    // Mettre à jour seulement les statuts sans recréer les cartes
-    for (const model of models) {
-      const modelInfo = await getModelInfo(model.username);
-      const isRecording = sessions.some(s => s.person === model.username && s.running);
-      
-      const card = document.querySelector(`[data-username="${model.username}"]`);
-      if (!card) continue;
-      
-      // Mettre à jour seulement les badges et statuts
-      const badge = card.querySelector('.badge');
-      const statusDot = card.querySelector('.status-dot');
-      const statusText = card.querySelector('.model-status');
-      
-      // Gérer les badges
-      if (isRecording && !badge) {
-        const badgeEl = document.createElement('div');
-        badgeEl.className = 'badge recording';
-        badgeEl.textContent = 'REC';
-        card.insertBefore(badgeEl, card.firstChild);
-      } else if (!isRecording && badge && badge.classList.contains('recording')) {
-        badge.remove();
-      }
-      
-      if (modelInfo.isOnline && !isRecording && !badge) {
-        const badgeEl = document.createElement('div');
-        badgeEl.className = 'badge live';
-        badgeEl.textContent = 'LIVE';
-        card.insertBefore(badgeEl, card.firstChild);
-      } else if (!modelInfo.isOnline && badge && badge.classList.contains('live')) {
-        badge.remove();
-      }
-      
-      // Mettre à jour le statut
-      if (statusDot) {
-        statusDot.className = `status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
-      }
-      if (statusText) {
-        statusText.innerHTML = `
-          <span class="status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}"></span>
-          ${isRecording ? 'En enregistrement' : modelInfo.isOnline ? 'En ligne' : 'Hors ligne'}
-          ${modelInfo.isOnline && modelInfo.viewers > 0 ? ` · ${modelInfo.viewers} viewers` : ''}
-        `;
-      }
-      
-      // Mettre à jour la classe de la carte
-      card.className = `model-card ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
-    }
-  }, 15000);
+  // Ne PAS rafraîchir automatiquement pour éviter les doublons
+  // L'utilisateur peut rafraîchir manuellement la page (F5) si besoin
   
   // Vérifier et démarrer les enregistrements toutes les 60 secondes
   setInterval(checkAndStartRecordings, 60000);

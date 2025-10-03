@@ -148,6 +148,7 @@
     
     /* Container */
     .container {
+      padding: 1rem;
     }
     
     /* Video Player */
@@ -732,7 +733,9 @@
               />
               <div class="recording-info" onclick="playRecording('${rec.url}', '${rec.filename}')">
                 <div class="recording-title">📹 ${rec.date}</div>
-                <div class="recording-meta">${rec.size_mb} MB</div>
+                <div class="recording-meta">
+                  ${rec.duration_str || ''} ${rec.duration_str ? '·' : ''} ${rec.size_mb} MB
+                </div>
                 ${progressPercent > 0 ? `
                   <div class="watch-progress">
                     <div class="progress-bar">

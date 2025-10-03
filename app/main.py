@@ -332,6 +332,30 @@ async def list_recordings(username: str):
             except:
                 pass
         
+        # Obtenir la durée de la vidéo avec ffprobe
+        duration_seconds = 0
+        try:
+            import subprocess
+            result = subprocess.run([
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(ts_file)
+            ], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                duration_seconds = int(float(result.stdout.strip()))
+        except:
+            pass
+        
+        # Formater la durée
+        hours = duration_seconds // 3600
+        minutes = (duration_seconds % 3600) // 60
+        seconds = duration_seconds % 60
+        if hours > 0:
+            duration_str = f"{hours}h{minutes:02d}m"
+        else:
+            duration_str = f"{minutes}m{seconds:02d}s"
+        
         recordings.append({
             "filename": ts_file.name,
             "date": ts_file.stem,
@@ -339,7 +363,9 @@ async def list_recordings(username: str):
             "size_mb": round(stat.st_size / 1024 / 1024, 2),
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "url": f"/streams/records/{username}/{ts_file.name}",
-            "thumbnail": thumb_url if thumb_path.exists() else None
+            "thumbnail": thumb_url if thumb_path.exists() else None,
+            "duration": duration_seconds,
+            "duration_str": duration_str
         })
     
     return {"recordings": recordings}
