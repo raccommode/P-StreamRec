@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>P-StreamRec</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; background: #0b0e12; color: #e8eef6; }
+    .card { background: #121720; border: 1px solid #223046; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    label { display:block; margin: 6px 0 4px; }
+    input[type=text] { width: 100%; padding: 8px; border: 1px solid #223046; border-radius: 6px; background:#0b0e12; color:#e8eef6; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+    button { background:#2a6df4; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+    button.secondary { background:#1f2937; }
+    .muted { color:#9bb0c9; }
+    .danger { color:#ff6b6b; }
+    .list { display:grid; gap:10px; }
+    video { width: 100%; max-height: 70vh; background:black; }
+    small.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#9bb0c9; }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <h1>P-StreamRec</h1>
+
+  <div class="card">
+    <p class="muted">
+      Fournissez une URL m3u8 directe ou, si activé côté serveur, un nom d'utilisateur Chaturbate.
+      Respectez toujours les CGU et la loi. Cette application ne contourne aucune protection.
+    </p>
+    <label for="target">URL m3u8 ou nom d'utilisateur</label>
+    <input id="target" type="text" placeholder="https://...m3u8 ou username" />
+
+    <div class="row" style="margin-top:8px;">
+      <label><input type="radio" name="stype" value="auto" checked> Auto</label>
+      <label><input type="radio" name="stype" value="m3u8"> m3u8</label>
+      <label><input type="radio" name="stype" value="chaturbate"> chaturbate</label>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <input id="name" type="text" placeholder="Nom d'enregistrement (optionnel)" />
+      <input id="person" type="text" placeholder="Personne (optionnel, sinon auto)" />
+      <button onclick="startSession()">Démarrer</button>
+      <button class="secondary" onclick="refreshStatus()">Rafraîchir</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <video id="player" controls></video>
+    <div id="nowPlaying" class="muted" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <h3>Sessions</h3>
+    <div id="sessions" class="list"></div>
+  </div>
+
+  <div class="card">
+    <small class="code">
+      Enregistrement: 1 fichier TS <b>par personne et par jour</b> sous <code>/data/records/&lt;person&gt;/YYYY-MM-DD.ts</code>.
+      HLS local pour lecture sous <code>/data/sessions/&lt;session_id&gt;/</code>. OUTPUT_DIR par défaut: <code>/data</code>.
+    </small>
+  </div>
+</body>
+</html>
