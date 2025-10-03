@@ -59,6 +59,11 @@ async def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 
+@app.get("/model.html")
+async def model_page():
+    return FileResponse(str(STATIC_DIR / "model.html"))
+
+
 @app.post("/api/start")
 async def api_start(body: StartBody):
     target = (body.target or "").strip()
