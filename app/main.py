@@ -134,3 +134,45 @@ async def api_stop(session_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Session introuvable")
     return {"stopped": True, "id": session_id}
+
+
+@app.get("/api/model/{username}/status")
+async def get_model_status(username: str):
+    """Récupère le statut et les infos d'un modèle Chaturbate"""
+    if not CB_RESOLVER_ENABLED:
+        raise HTTPException(status_code=400, detail="Résolution Chaturbate désactivée")
+    
+    try:
+        import requests
+        url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "username": username,
+                "isOnline": data.get("room_status") == "public" or bool(data.get("hls_source")),
+                "thumbnail": data.get("room_image") or f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+                "viewers": data.get("num_users", 0)
+            }
+        else:
+            # Fallback si l'API ne répond pas
+            return {
+                "username": username,
+                "isOnline": False,
+                "thumbnail": f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+                "viewers": 0
+            }
+    except Exception as e:
+        # En cas d'erreur, retourner offline
+        return {
+            "username": username,
+            "isOnline": False,
+            "thumbnail": f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+            "viewers": 0
+        }

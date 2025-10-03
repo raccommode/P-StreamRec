@@ -72,19 +72,19 @@ async function addModel(event) {
 
 async function getModelInfo(username) {
   try {
-    // Essayer de récupérer les infos depuis Chaturbate API
-    const response = await fetch(`https://chaturbate.com/api/chatvideocontext/${username}/`);
+    // Utiliser notre API backend pour éviter les problèmes CORS
+    const response = await fetch(`/api/model/${username}/status`);
     if (response.ok) {
       const data = await response.json();
       return {
-        username: username,
-        thumbnail: data.room_image || `https://roomimg.stream.highwebmedia.com/ri/${username}.jpg`,
-        isOnline: data.room_status === 'public' || !!data.hls_source,
-        viewers: data.num_users || 0
+        username: data.username,
+        thumbnail: data.thumbnail,
+        isOnline: data.isOnline,
+        viewers: data.viewers || 0
       };
     }
   } catch (e) {
-    console.error('Erreur API Chaturbate:', e);
+    console.error(`Erreur récupération infos ${username}:`, e);
   }
   
   // Fallback: utiliser l'image par défaut
