@@ -455,19 +455,28 @@
         
         // Gestion des erreurs HLS
         hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
-          console.error('Erreur HLS:', data);
+          console.error('❌ Erreur HLS:', data);
+          console.error('Type:', data.type, 'Fatal:', data.fatal, 'Details:', data.details);
+          
+          // Afficher l'erreur à l'utilisateur
+          const errorMsg = `Erreur HLS: ${data.details} (${data.type})`;
+          showNotification(errorMsg, 'error');
+          
           if (data.fatal) {
             switch(data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log('Erreur réseau, tentative de récupération...');
+                console.log('🔄 Erreur réseau, tentative de récupération...');
+                showNotification('Erreur réseau, reconnexion...', 'info');
                 hlsPlayer.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log('Erreur média, tentative de récupération...');
+                console.log('🔄 Erreur média, tentative de récupération...');
+                showNotification('Erreur média, récupération...', 'info');
                 hlsPlayer.recoverMediaError();
                 break;
               default:
-                console.error('Erreur fatale, rechargement...');
+                console.error('💥 Erreur fatale, rechargement...');
+                showNotification('Erreur fatale, rechargement dans 2s...', 'error');
                 hlsPlayer.destroy();
                 setTimeout(() => loadStream(url), 2000);
                 break;
