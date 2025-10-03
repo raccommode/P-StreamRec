@@ -232,30 +232,44 @@ async def get_thumbnail(username: str):
     from fastapi.responses import Response
     
     try:
-        # URL directe de l'image Chaturbate
-        img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
+        # Essayer plusieurs URLs de miniatures Chaturbate
+        img_urls = [
+            f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+            f"https://cbjpeg.stream.highwebmedia.com/stream?room={username}&f=.jpg",
+        ]
         
-        # Récupérer l'image
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Referer": "https://chaturbate.com/",
         }
         
-        response = requests.get(img_url, headers=headers, timeout=5, allow_redirects=True)
+        # Essayer chaque URL
+        for img_url in img_urls:
+            try:
+                response = requests.get(img_url, headers=headers, timeout=5, allow_redirects=True)
+                
+                if response.status_code == 200 and len(response.content) > 1000:  # Image valide
+                    return Response(
+                        content=response.content,
+                        media_type="image/jpeg",
+                        headers={
+                            "Cache-Control": "public, max-age=300",
+                        }
+                    )
+            except:
+                continue
         
-        if response.status_code == 200:
-            return Response(
-                content=response.content,
-                media_type="image/jpeg",
-                headers={
-                    "Cache-Control": "public, max-age=600",
-                }
-            )
-        
-        # Si erreur, retourner image par défaut (SVG placeholder)
+        # Si aucune image trouvée, retourner SVG gradient moderne
         svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
-            <rect fill="#1a1f3a" width="280" height="200"/>
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#a0aec0" font-family="system-ui" font-size="16">{username}</text>
+            <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <rect fill="url(#grad)" width="280" height="200"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="18" font-weight="600">{username}</text>
+            <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="12" opacity="0.8">📷 Miniature indisponible</text>
         </svg>'''
         
         return Response(

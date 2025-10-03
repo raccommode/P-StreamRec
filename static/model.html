@@ -297,20 +297,22 @@
       ⏺ Démarrer l'enregistrement
     </button>
     <button class="action-btn btn-delete" onclick="deleteModel()">
-      🗑️ Supprimer
     </button>
   </header>
 
   <div class="container">
-    <div class="video-container">
-      <video id="player" controls></video>
-      <div class="video-controls">
-        <button class="control-btn" onclick="player.play()">▶️ Play</button>
-        <button class="control-btn" onclick="player.pause()">⏸️ Pause</button>
-        <button class="control-btn" onclick="player.muted = !player.muted">🔊 Son</button>
-        <button class="control-btn" onclick="player.requestFullscreen()">⛶ Plein écran</button>
+    <div class="player-container">
+      <video id="player" class="video-player" controls muted autoplay></video>
+      <div class="empty-message">
+        <div class="icon">📺</div>
+        <p>Aucun stream en cours</p>
       </div>
     </div>
+    <div class="video-controls">
+      <button class="control-btn" onclick="player.play()">▶️ Play</button>
+      <button class="control-btn" onclick="player.pause()">⏸️ Pause</button>
+      <button class="control-btn" onclick="player.muted = !player.muted">🔊 Son</button>
+      <button class="control-btn" onclick="player.requestFullscreen()">⛶ Plein écran</button>
 
     <div class="recordings-section">
       <div class="section-header">
@@ -463,8 +465,12 @@
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         console.log('📱 Utilisation du lecteur natif');
         video.src = url;
-        // Essayer de démarrer automatiquement
-        video.play().catch(e => console.log('Autoplay bloqué, cliquez sur play'));
+        video.muted = true; // Son coupé
+        // Démarrer automatiquement
+        video.play().catch(e => {
+          console.log('Autoplay bloqué');
+          showNotification('Cliquez sur ▶️ pour lancer', 'info');
+        });
       } else if (window.Hls && window.Hls.isSupported()) {
         console.log('🎥 Utilisation de HLS.js');
         if (hlsPlayer) {
@@ -511,10 +517,15 @@
         
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('✅ Manifest chargé, démarrage lecture...');
-          // Essayer de démarrer automatiquement une fois le manifest chargé
-          video.play().catch(e => {
-            console.log('Autoplay bloqué, cliquez sur play');
-            showNotification('Cliquez sur ▶️ pour lancer la lecture', 'info');
+          // Son coupé pour autoplay
+          video.muted = true;
+          // Démarrer automatiquement
+          video.play().then(() => {
+            console.log('✅ Lecture démarrée (son coupé)');
+            showNotification('Lecture démarrée (cliquez 🔊 pour activer le son)', 'info');
+          }).catch(e => {
+            console.log('Autoplay bloqué');
+            showNotification('Cliquez sur ▶️ pour lancer', 'info');
           });
         });
         
