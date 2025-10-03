@@ -1,73 +1,83 @@
 # P-StreamRec
 
-Conteneur tout‑en‑un pour lire un flux HLS et l’enregistrer au format TS, via une interface web.
+**Application complète pour l'enregistrement automatique de streams Chaturbate et m3u8**
 
-- Interface: FastAPI + HTML/JS (hls.js)
-- Lecture: HLS local généré par ffmpeg (stream.m3u8 + segments)
-- Enregistrement: 1 fichier TS par personne et par jour
-  - Chemin: `OUTPUT_DIR/records/<person>/YYYY-MM-DD.ts`
-  - HLS par session: `OUTPUT_DIR/sessions/<session_id>/`
+Conteneur Docker tout-en-un pour regarder et enregistrer automatiquement des flux HLS/m3u8, avec une interface web moderne.
 
-## Variables d’environnement
-- `OUTPUT_DIR` (défaut: `/data`) — Dossier des sorties (monté en volume)
-- `PORT` (défaut: `8080`) — Port HTTP du service
-- `FFMPEG_PATH` (défaut: `ffmpeg`)
-- `HLS_TIME` (défaut: `4`) — Durée de segment HLS (s)
-- `HLS_LIST_SIZE` (défaut: `6`) — Taille de la playlist HLS
-- `CB_RESOLVER_ENABLED` (défaut: `false`) — Activer la résolution Chaturbate depuis un pseudo
-- `CB_COOKIE` — Cookie de session si requis par la résolution Chaturbate
-- `TZ` (optionnel) — Fuseau horaire à l’intérieur du conteneur
+## Fonctionnalités principales
 
-## Démarrage rapide (Docker run)
+- **Enregistrement automatique** des streams Chaturbate par nom d'utilisateur
+- **Interface web moderne** pour contrôler les enregistrements
+- **Détection automatique** quand un utilisateur est en ligne
+- **Rotation journalière** des fichiers (1 fichier TS par jour)
+- **Support des URLs m3u8 directes** pour tout type de stream
+- **Docker ready** avec docker-compose pour Portainer/Umbrel
+
+## Structure des données
+
+- **Enregistrements:** `/data/records/<person>/YYYY-MM-DD.ts`
+- **HLS streaming:** `/data/sessions/<session_id>/`
+- **Format:** MPEG-TS compatible avec tous les lecteurs (VLC, MPV, etc.)
+
+## Configuration (Variables d'environnement)
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `OUTPUT_DIR` | `/data` | Dossier des enregistrements (volume Docker) |
+| `PORT` | `8080` | Port de l'interface web |
+| `FFMPEG_PATH` | `ffmpeg` | Chemin vers ffmpeg |
+| `HLS_TIME` | `4` | Durée des segments HLS (secondes) |
+| `HLS_LIST_SIZE` | `6` | Nombre de segments dans la playlist |
+| `CB_RESOLVER_ENABLED` | `true` | **Activer le support Chaturbate** |
+| `CB_COOKIE` | - | Cookie de session Chaturbate (optionnel) |
+| `AUTO_RECORD_USERS` | - | Liste d'utilisateurs à enregistrer automatiquement (séparés par virgule) |
+| `TZ` | `UTC` | Fuseau horaire (ex: `Europe/Paris`) |
+
+## Démarrage rapide
+
+### Option 1: Docker Run
 ```bash
-# Construire l'image localement (ou utiliser docker-compose/Portainer)
-docker build -t p-streamrec:latest .
+{{ ... }}
+Si erreur "failed to load the compose file":
+1. Vérifiez que `docker-compose.yml` est présent dans le repo
+2. Vérifiez que "Compose path" = `docker-compose.yml`
+3. Vérifiez que la branche = `main`
 
-mkdir -p ./data
+## Utilisation
 
-docker run --name p-streamrec \
-  -p 8080:8080 \
-  -v "$(pwd)/data:/data" \
-  -e OUTPUT_DIR=/data \
-  -e PORT=8080 \
-  -e CB_RESOLVER_ENABLED=false \
-  p-streamrec:latest
+### Interface Web (http://localhost:8080)
+
+1. **Démarrer un enregistrement:**
+   - Entrez un nom d'utilisateur Chaturbate (ex: `username`)
+   - Ou collez une URL m3u8 directe
+   - Cliquez sur **Démarrer l'enregistrement**
+
+2. **Regarder en direct:**
+   - L'enregistrement actif apparait dans la liste
+   - Cliquez sur **Regarder** pour voir le stream en direct
+   - Le lecteur vidéo intégré supporte HLS nativement
+
+3. **Gérer les sessions:**
+   - **URL** : Copier le lien du stream
+   - **Stop** : Arrêter un enregistrement
+   - **Arrêter tout** : Stopper tous les enregistrements
+
+### Enregistrement automatique
+
+#### Méthode 1: Variable d'environnement
+```yaml
+AUTO_RECORD_USERS=user1,user2,user3
 ```
-Puis, ouvrez http://localhost:8080, saisissez une URL m3u8 ou un pseudo (si Chaturbate activé), cliquez « Démarrer ».
 
-## docker-compose
-Un fichier `docker-compose.yml` est fourni à la racine.
-
-```bash
-# Lancer avec compose (standalone)
-# Variables optionnelles: HOST_PORT, PORT, HOST_DATA_DIR, HLS_TIME, HLS_LIST_SIZE, CB_RESOLVER_ENABLED, TZ
-HOST_PORT=8080 PORT=8080 HOST_DATA_DIR=./data \
-  docker compose up -d --build
+#### Méthode 2: Fichier de configuration
+Créez `/data/auto_record_users.txt` avec un nom d'utilisateur par ligne:
 ```
-Compose expose le service sur `http://localhost:${HOST_PORT}` et monte `${HOST_DATA_DIR}` sur `/data` dans le conteneur.
+user1
+user2
+user3
+```
 
-## Portainer (Stack -> Repository)
-1) Dans Portainer, allez dans « Stacks » > « Add stack » > « Repository »
-2) Renseignez:
-   - Repository URL: `https://github.com/raccommode/P-StreamRec`
-   - Compose path: `docker-compose.yml` (chemin par défaut)
-   - Reference/Branch: `main` (ou la branche cible)
-3) Variables (optionnel):
-   - `HOST_PORT` (ex: 8080), `PORT` (ex: 8080)
-   - `HOST_DATA_DIR` (ex: `./data` ou `/srv/p-streamrec/data`)
-   - `CB_RESOLVER_ENABLED` (`false` ou `true`), `TZ` (ex: `Europe/Paris`)
-4) Déployez la stack.
-
-Si Portainer affiche « failed to load the compose file … docker-compose.yml: no such file or directory », assurez‑vous que:
-- `docker-compose.yml` est bien présent à la racine du repo (commité et poussé),
-- « Compose path » est `docker-compose.yml`,
-- La branche choisie contient ce fichier.
-
-## Utilisation de l’UI
-- Champ « URL m3u8 ou nom d’utilisateur »: l’URL HLS directe ou le pseudo (si résolveur actif)
-- « Personne » (optionnel): le nom de bucket d’enregistrement. Si vide, il est déduit (pseudo ou extrait de l’URL)
-- « Démarrer »: crée une session HLS locale et enregistre vers `records/<person>/YYYY-MM-DD.ts`
-- « Stop »: arrête la session
+Le système vérifie automatiquement toutes les 30 secondes si les utilisateurs sont en ligne et démarre l'enregistrement.
 
 ## Développement local
 ```bash
@@ -76,7 +86,28 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+## Récupération des enregistrements
+
+Les fichiers sont stockés dans `/data/records/<username>/YYYY-MM-DD.ts`
+
+**Pour lire les fichiers TS:**
+- **VLC:** Ouvrir directement le fichier
+- **MPV:** `mpv /path/to/file.ts`
+- **FFmpeg conversion en MP4:** 
+  ```bash
+  ffmpeg -i input.ts -c copy output.mp4
+  ```
+
+## Notes importantes
+
+- **Respect de la vie privée:** Utilisez uniquement pour du contenu public
+- **Stockage:** Les fichiers TS peuvent être volumineux (~2-4 GB/heure)
+- **Bande passante:** Chaque stream consomme environ 1-3 Mbps
+- **CPU:** Utilisation minimale (simple copie de flux)
+
 ## Notes légales
-- Utilisez ce logiciel dans le respect des lois et des CGU des services concernés.
-- Ce projet ne contourne aucune protection.
-- Assurez‑vous d’avoir le droit de lire et d’enregistrer le contenu cible.
+
+- Utilisez ce logiciel dans le respect des lois et des CGU des services
+- Ne contourne aucune protection technique
+- Assurez-vous d'avoir le droit d'enregistrer le contenu
+- Respectez la vie privée et les droits d'auteur

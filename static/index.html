@@ -8,15 +8,29 @@
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; background: #0b0e12; color: #e8eef6; }
     .card { background: #121720; border: 1px solid #223046; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
     label { display:block; margin: 6px 0 4px; }
-    input[type=text] { width: 100%; padding: 8px; border: 1px solid #223046; border-radius: 6px; background:#0b0e12; color:#e8eef6; }
+    input[type=text], input[type=url] { width: 100%; padding: 8px; border: 1px solid #223046; border-radius: 6px; background:#0b0e12; color:#e8eef6; }
     .row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
-    button { background:#2a6df4; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+    button { background:#2a6df4; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; transition: all 0.2s; }
+    button:hover { background:#1e5de8; }
     button.secondary { background:#1f2937; }
+    button.secondary:hover { background:#2d3748; }
+    button.danger { background:#ff6b6b; }
+    button.danger:hover { background:#ff5252; }
+    button.success { background:#10b981; }
     .muted { color:#9bb0c9; }
     .danger { color:#ff6b6b; }
+    .success { color:#10b981; }
     .list { display:grid; gap:10px; }
-    video { width: 100%; max-height: 70vh; background:black; }
+    video { width: 100%; max-height: 70vh; background:black; border-radius: 8px; }
     small.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#9bb0c9; }
+    .status-indicator { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; }
+    .status-online { background:#10b981; animation: pulse 2s infinite; }
+    .status-offline { background:#6b7280; }
+    .status-recording { background:#ff6b6b; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    .quick-links { display: flex; gap: 8px; margin-top: 12px; }
+    .quick-link { background: #1f2937; padding: 6px 12px; border-radius: 6px; text-decoration: none; color: #9bb0c9; font-size: 14px; }
+    .quick-link:hover { background: #2d3748; }
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script defer src="/static/app.js"></script>
@@ -25,41 +39,66 @@
   <h1>P-StreamRec</h1>
 
   <div class="card">
-    <p class="muted">
-      Fournissez une URL m3u8 directe ou, si activé côté serveur, un nom d'utilisateur Chaturbate.
-      Respectez toujours les CGU et la loi. Cette application ne contourne aucune protection.
+    <h3>🎥 Démarrer un enregistrement</h3>
+    <p class="muted" style="font-size: 14px;">
+      Entrez un nom d'utilisateur Chaturbate ou une URL m3u8 directe.
+      L'enregistrement démarre automatiquement dès que le stream est disponible.
     </p>
-    <label for="target">URL m3u8 ou nom d'utilisateur</label>
-    <input id="target" type="text" placeholder="https://...m3u8 ou username" />
+    <label for="target">URL m3u8 ou nom d'utilisateur Chaturbate</label>
+    <input id="target" type="text" placeholder="Ex: username ou https://...m3u8" />
 
     <div class="row" style="margin-top:8px;">
-      <label><input type="radio" name="stype" value="auto" checked> Auto</label>
-      <label><input type="radio" name="stype" value="m3u8"> m3u8</label>
-      <label><input type="radio" name="stype" value="chaturbate"> chaturbate</label>
+      <label><input type="radio" name="stype" value="auto" checked> 🔍 Auto-détection</label>
+      <label><input type="radio" name="stype" value="chaturbate"> 💜 Chaturbate</label>
+      <label><input type="radio" name="stype" value="m3u8"> 🔗 URL m3u8</label>
     </div>
 
-    <div class="row" style="margin-top:8px;">
-      <input id="name" type="text" placeholder="Nom d'enregistrement (optionnel)" />
-      <input id="person" type="text" placeholder="Personne (optionnel, sinon auto)" />
-      <button onclick="startSession()">Démarrer</button>
-      <button class="secondary" onclick="refreshStatus()">Rafraîchir</button>
+    <div class="row" style="margin-top:12px;">
+      <input id="name" type="text" placeholder="Nom affiché (optionnel)" style="flex:1;" />
+      <input id="person" type="text" placeholder="Dossier d'enregistrement (optionnel)" style="flex:1;" />
+    </div>
+    
+    <div class="row" style="margin-top:12px;">
+      <button onclick="startSession()" class="success">▶️ Démarrer l'enregistrement</button>
+      <button class="secondary" onclick="refreshStatus()">🔄 Rafraîchir</button>
+      <button class="secondary" onclick="showQuickAdd()">⚡ Ajout rapide</button>
+    </div>
+
+    <div class="quick-links" id="quickLinks" style="display:none;">
+      <span class="muted" style="font-size:12px;">Exemples rapides:</span>
+      <a href="#" class="quick-link" onclick="setQuickTarget('exemple_user'); return false;">exemple_user</a>
+      <a href="#" class="quick-link" onclick="setQuickTarget('autre_user'); return false;">autre_user</a>
     </div>
   </div>
 
   <div class="card">
-    <video id="player" controls></video>
+    <h3>📺 Lecteur en direct</h3>
+    <video id="player" controls muted></video>
     <div id="nowPlaying" class="muted" style="margin-top:8px;"></div>
+    <div class="row" style="margin-top:8px;">
+      <button onclick="player.play()" class="secondary">▶️ Play</button>
+      <button onclick="player.pause()" class="secondary">⏸️ Pause</button>
+      <button onclick="player.muted = !player.muted; this.textContent = player.muted ? '🔇 Unmute' : '🔊 Mute'" class="secondary">🔇 Unmute</button>
+    </div>
   </div>
 
   <div class="card">
-    <h3>Sessions</h3>
+    <h3>📊 Sessions actives</h3>
+    <div class="row" style="margin-bottom:12px;">
+      <span id="sessionCount" class="muted">Chargement...</span>
+      <button onclick="stopAllSessions()" class="danger" style="margin-left:auto;">⏹️ Arrêter tout</button>
+    </div>
     <div id="sessions" class="list"></div>
   </div>
 
-  <div class="card">
-    <small class="code">
-      Enregistrement: 1 fichier TS <b>par personne et par jour</b> sous <code>/data/records/&lt;person&gt;/YYYY-MM-DD.ts</code>.
-      HLS local pour lecture sous <code>/data/sessions/&lt;session_id&gt;/</code>. OUTPUT_DIR par défaut: <code>/data</code>.
+  <div class="card" style="background: #0f172a;">
+    <h4>ℹ️ Informations système</h4>
+    <small class="code" style="line-height:1.6;">
+      📁 <b>Enregistrements:</b> <code>/data/records/&lt;person&gt;/YYYY-MM-DD.ts</code><br>
+      📺 <b>HLS streaming:</b> <code>/data/sessions/&lt;session_id&gt;/</code><br>
+      🔧 <b>Configuration:</b> CB_RESOLVER_ENABLED = <span id="cbStatus" class="success">actif</span><br>
+      💾 <b>Format:</b> MPEG-TS (compatible avec tous les lecteurs)<br>
+      🕐 <b>Rotation:</b> Automatique à minuit (nouveau fichier chaque jour)
     </small>
   </div>
 </body>

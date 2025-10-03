@@ -15,8 +15,9 @@ services:
       - HLS_TIME=${HLS_TIME:-4}
       - HLS_LIST_SIZE=${HLS_LIST_SIZE:-6}
       - CB_RESOLVER_ENABLED=${CB_RESOLVER_ENABLED:-true}
+      - AUTO_RECORD_USERS=${AUTO_RECORD_USERS:-}
       # - CB_COOKIE=session=...; autre=...   # Optionnel
-      - TZ=${TZ:-UTC}
+      - TZ=${TZ:-Europe/Paris}
     ports:
       - "${HOST_PORT:-8080}:${PORT:-8080}"
     volumes:
