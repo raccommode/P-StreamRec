@@ -352,6 +352,10 @@
           const wasRecording = currentSession && currentSession.id === session.id;
           currentSession = session;
           
+          console.log('📊 Session trouvée:', session);
+          console.log('📺 Playback URL:', session.playback_url);
+          console.log('🔄 Était déjà en enregistrement:', wasRecording);
+          
           document.getElementById('statusDot').className = 'status-dot recording';
           document.getElementById('statusText').textContent = 'En enregistrement';
           document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
@@ -359,7 +363,10 @@
           
           // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
           if (!wasRecording) {
+            console.log('▶️ Chargement du stream...');
             loadStream(session.playback_url);
+          } else {
+            console.log('⏭️ Stream déjà chargé, skip');
           }
         } else if (modelInfo.isOnline) {
           currentSession = null;
@@ -422,13 +429,16 @@
 
     // Charger le stream
     function loadStream(url) {
+      console.log('🎬 Chargement du stream:', url);
       const video = document.getElementById('player');
       
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        console.log('📱 Utilisation du lecteur natif');
         video.src = url;
         // Essayer de démarrer automatiquement
         video.play().catch(e => console.log('Autoplay bloqué, cliquez sur play'));
       } else if (window.Hls && window.Hls.isSupported()) {
+        console.log('🎥 Utilisation de HLS.js');
         if (hlsPlayer) {
           hlsPlayer.destroy();
         }
@@ -436,18 +446,53 @@
           liveDurationInfinity: true,
           enableWorker: true,
           lowLatencyMode: true,
+          debug: false,
           // Toujours sélectionner la meilleure qualité disponible
           startLevel: -1,  // -1 = auto-select (choisit la meilleure)
           capLevelToPlayerSize: false,  // Ne pas limiter la qualité à la taille du lecteur
           maxMaxBufferLength: 600,  // Buffer plus long pour éviter les coupures
         });
+        
+        // Gestion des erreurs HLS
+        hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
+          console.error('Erreur HLS:', data);
+          if (data.fatal) {
+            switch(data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.log('Erreur réseau, tentative de récupération...');
+                hlsPlayer.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.log('Erreur média, tentative de récupération...');
+                hlsPlayer.recoverMediaError();
+                break;
+              default:
+                console.error('Erreur fatale, rechargement...');
+                hlsPlayer.destroy();
+                setTimeout(() => loadStream(url), 2000);
+                break;
+            }
+          }
+        });
+        
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
+        
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('✅ Manifest chargé, démarrage lecture...');
           // Essayer de démarrer automatiquement une fois le manifest chargé
-          video.play().catch(e => console.log('Autoplay bloqué, cliquez sur play'));
+          video.play().catch(e => {
+            console.log('Autoplay bloqué, cliquez sur play');
+            showNotification('Cliquez sur ▶️ pour lancer la lecture', 'info');
+          });
         });
+        
+        hlsPlayer.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+          console.log('✅ Niveau chargé:', data.level, 'Segments:', data.details.fragments.length);
+        });
+        
       } else {
+        console.error('HLS non supporté par ce navigateur');
         showNotification('HLS non supporté', 'error');
       }
     }
