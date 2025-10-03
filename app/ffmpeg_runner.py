@@ -112,7 +112,10 @@ class FFmpegManager:
                 "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "30",
                 "-i", sess.input_url,
-                "-map", "0", "-c", "copy",
+                "-map", "0:v:0", "-map", "0:a:0?",  # Sélectionner la première piste vidéo et audio
+                "-c", "copy",  # Copier sans re-encodage pour préserver la qualité
+                "-bsf:a", "aac_adtstoasc",  # Convertir AAC si nécessaire
+                "-movflags", "+faststart",  # Optimiser pour le streaming
                 "-f", "tee", tee_spec,
             ]
 

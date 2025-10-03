@@ -66,18 +66,21 @@ def resolve_m3u8(username: str) -> str:
                 raise ResolveError("Impossible de parser la réponse du serveur.")
             
             # Chercher le flux HLS dans différents champs possibles
-            m3u8 = (data.get("hls_source") or 
-                   data.get("hls_source_cdn") or
+            # Priorité: source_cdn > source > autres (pour avoir la meilleure qualité)
+            m3u8 = (data.get("hls_source_cdn") or  # CDN souvent meilleure qualité
+                   data.get("hls_source") or 
+                   data.get("edge_hls_url") or
                    data.get("hls_src") or 
                    data.get("url") or 
-                   data.get("hls_url") or
-                   data.get("edge_hls_url"))
+                   data.get("hls_url"))
             
             if m3u8:
                 # Nettoyer l'URL si nécessaire
                 m3u8 = m3u8.replace("\\/", "/")
                 if m3u8.startswith("//"):
                     m3u8 = "https:" + m3u8
+                
+                # Si c'est une playlist master, FFmpeg sélectionnera automatiquement la meilleure qualité
                 return m3u8
             
             # Vérifier si l'utilisateur est en ligne

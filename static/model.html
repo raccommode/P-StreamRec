@@ -349,14 +349,18 @@
         const modelInfo = statusRes.ok ? await statusRes.json() : { isOnline: false };
 
         if (session && session.running) {
+          const wasRecording = currentSession && currentSession.id === session.id;
           currentSession = session;
+          
           document.getElementById('statusDot').className = 'status-dot recording';
           document.getElementById('statusText').textContent = 'En enregistrement';
           document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
           document.getElementById('recordBtn').className = 'action-btn btn-stop';
           
-          // Charger le stream automatiquement
-          loadStream(session.playback_url);
+          // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
+          if (!wasRecording) {
+            loadStream(session.playback_url);
+          }
         } else if (modelInfo.isOnline) {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot online';
@@ -431,7 +435,11 @@
         hlsPlayer = new Hls({ 
           liveDurationInfinity: true,
           enableWorker: true,
-          lowLatencyMode: true
+          lowLatencyMode: true,
+          // Toujours sélectionner la meilleure qualité disponible
+          startLevel: -1,  // -1 = auto-select (choisit la meilleure)
+          capLevelToPlayerSize: false,  // Ne pas limiter la qualité à la taille du lecteur
+          maxMaxBufferLength: 600,  // Buffer plus long pour éviter les coupures
         });
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
