@@ -300,21 +300,98 @@ async def list_recordings(username: str):
     from datetime import datetime
     
     records_dir = OUTPUT_DIR / "records" / username
+    thumbnails_dir = OUTPUT_DIR / "thumbnails" / username
     
     if not records_dir.exists():
         return {"recordings": []}
+    
+    # Créer le dossier thumbnails si nécessaire
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
     
     # Trouver tous les fichiers .ts
     recordings = []
     for ts_file in sorted(records_dir.glob("*.ts"), reverse=True):
         stat = ts_file.stat()
+        
+        # Générer miniature si elle n'existe pas
+        thumb_path = thumbnails_dir / f"{ts_file.stem}.jpg"
+        thumb_url = f"/api/recording-thumbnail/{username}/{ts_file.stem}.jpg"
+        
+        if not thumb_path.exists() and ts_file.stat().st_size > 1024 * 1024:  # > 1MB
+            # Générer miniature en arrière-plan
+            import subprocess
+            try:
+                subprocess.Popen([
+                    FFMPEG_PATH, "-i", str(ts_file),
+                    "-ss", "00:00:10",  # À 10 secondes
+                    "-vframes", "1",
+                    "-vf", "scale=320:-1",
+                    "-y",
+                    str(thumb_path)
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except:
+                pass
+        
         recordings.append({
             "filename": ts_file.name,
-            "date": ts_file.stem,  # Le nom du fichier est la date (YYYY-MM-DD.ts)
+            "date": ts_file.stem,
             "size": stat.st_size,
             "size_mb": round(stat.st_size / 1024 / 1024, 2),
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "url": f"/streams/records/{username}/{ts_file.name}"
+            "url": f"/streams/records/{username}/{ts_file.name}",
+            "thumbnail": thumb_url if thumb_path.exists() else None
         })
     
     return {"recordings": recordings}
+
+
+@app.get("/api/recording-thumbnail/{username}/{filename}")
+async def get_recording_thumbnail(username: str, filename: str):
+    """Récupère la miniature d'un enregistrement"""
+    from fastapi.responses import FileResponse, Response
+    
+    # Sécurité
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Nom invalide")
+    
+    thumb_path = OUTPUT_DIR / "thumbnails" / username / filename
+    
+    if thumb_path.exists():
+        return FileResponse(
+            path=str(thumb_path),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"}
+        )
+    
+    # Placeholder SVG si pas de miniature
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">
+        <rect fill="#1a1f3a" width="320" height="180"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#a0aec0" font-size="16">📹 Génération...</text>
+    </svg>'''
+    
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+@app.delete("/api/recordings/{username}/{filename}")
+async def delete_recording(username: str, filename: str):
+    """Supprime un enregistrement"""
+    from fastapi.responses import Response
+    
+    # Sécurité
+    if ".." in filename or "/" in filename or not filename.endswith(".ts"):
+        raise HTTPException(status_code=400, detail="Nom invalide")
+    
+    ts_path = OUTPUT_DIR / "records" / username / filename
+    thumb_path = OUTPUT_DIR / "thumbnails" / username / f"{Path(filename).stem}.jpg"
+    
+    if not ts_path.exists():
+        raise HTTPException(status_code=404, detail="Enregistrement introuvable")
+    
+    # Supprimer le fichier TS et la miniature
+    try:
+        ts_path.unlink()
+        if thumb_path.exists():
+            thumb_path.unlink()
+        return {"success": True, "message": f"{filename} supprimé"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

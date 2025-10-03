@@ -254,12 +254,11 @@
     .recording-item {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 1rem;
       padding: 1rem;
       background: var(--bg-secondary);
       border-radius: 12px;
       border: 1px solid var(--border);
-      cursor: pointer;
       transition: all 0.3s ease;
     }
     
@@ -269,8 +268,23 @@
       transform: translateY(-2px);
     }
     
+    .recording-thumbnail {
+      width: 160px;
+      height: 90px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .recording-thumbnail:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    
     .recording-info {
       flex: 1;
+      cursor: pointer;
     }
     
     .recording-title {
@@ -283,6 +297,40 @@
     .recording-meta {
       font-size: 0.85rem;
       color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+    
+    .watch-progress {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .progress-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--bg-primary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      min-width: 35px;
+    }
+    
+    .recording-actions {
+      display: flex;
+      gap: 0.5rem;
     }
     
     .play-btn {
@@ -305,24 +353,24 @@
       transform: scale(1.1);
     }
     
-    .recording-item {
-      background: var(--bg-secondary);
-      padding: 1rem;
-      border-radius: 10px;
+    .delete-btn {
+      background: var(--danger);
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      border: 1px solid var(--border);
-      transition: all 0.3s;
+      justify-content: center;
     }
     
-    .recording-item:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--accent);
-    }
-    
-    .recording-info {
-      flex: 1;
+    .delete-btn:hover {
+      background: #dc2626;
+      transform: scale(1.1);
     }
     
     .recording-name {
@@ -649,15 +697,38 @@
         if (data.recordings && data.recordings.length > 0) {
           count.textContent = `${data.recordings.length} fichier${data.recordings.length > 1 ? 's' : ''}`;
           
-          list.innerHTML = data.recordings.map(rec => `
-            <div class="recording-item" onclick="playRecording('${rec.url}')">
-              <div class="recording-info">
+          list.innerHTML = data.recordings.map(rec => {
+            const progress = getWatchProgress(rec.filename);
+            const progressPercent = progress ? Math.round((progress.position / progress.duration) * 100) : 0;
+            
+            return `
+            <div class="recording-item">
+              <img 
+                src="${rec.thumbnail || '/api/recording-thumbnail/' + username + '/' + rec.date + '.jpg'}" 
+                alt="${rec.date}"
+                class="recording-thumbnail"
+                onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%2290%22%3E%3Crect fill=%22%231a1f3a%22 width=%22160%22 height=%2290%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-size=%2214%22%3E📹%3C/text%3E%3C/svg%3E'"
+                onclick="playRecording('${rec.url}', '${rec.filename}')"
+              />
+              <div class="recording-info" onclick="playRecording('${rec.url}', '${rec.filename}')">
                 <div class="recording-title">📹 ${rec.date}</div>
                 <div class="recording-meta">${rec.size_mb} MB</div>
+                ${progressPercent > 0 ? `
+                  <div class="watch-progress">
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                    </div>
+                    <span class="progress-text">${progressPercent}%</span>
+                  </div>
+                ` : ''}
               </div>
-              <button class="play-btn">▶️</button>
+              <div class="recording-actions">
+                <button class="play-btn" onclick="event.stopPropagation(); playRecording('${rec.url}', '${rec.filename}')">▶️</button>
+                <button class="delete-btn" onclick="event.stopPropagation(); deleteRecording('${rec.filename}')">🗑️</button>
+              </div>
             </div>
-          `).join('');
+          `;
+          }).join('');
         } else {
           list.innerHTML = `
             <div class="empty-message">
@@ -679,8 +750,24 @@
       }
     }
     
+    // Sauvegarder la progression de lecture
+    function saveWatchProgress(filename, position, duration) {
+      const key = `watch_progress_${username}_${filename}`;
+      localStorage.setItem(key, JSON.stringify({ position, duration, timestamp: Date.now() }));
+    }
+    
+    // Récupérer la progression de lecture
+    function getWatchProgress(filename) {
+      const key = `watch_progress_${username}_${filename}`;
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    }
+    
+    // Variable pour suivre l'enregistrement en cours
+    let currentRecordingFile = null;
+    
     // Lire un enregistrement
-    function playRecording(url) {
+    function playRecording(url, filename) {
       console.log('📹 Lecture enregistrement:', url);
       const video = document.getElementById('player');
       
@@ -690,14 +777,51 @@
         hlsPlayer = null;
       }
       
+      currentRecordingFile = filename;
+      
       // Charger la vidéo directement
       video.src = url;
+      
+      // Reprendre à la position sauvegardée
+      const progress = getWatchProgress(filename);
+      if (progress && progress.position > 10) {
+        video.currentTime = progress.position;
+        showNotification(`Reprise à ${Math.floor(progress.position / 60)}min ${Math.floor(progress.position % 60)}s`, 'info');
+      }
+      
       video.play();
       
       // Retourner à l'onglet Live pour voir le lecteur
       switchTab('live');
       
       showNotification('Lecture de l\'enregistrement...', 'info');
+    }
+    
+    // Supprimer un enregistrement
+    async function deleteRecording(filename) {
+      if (!confirm(`Supprimer ${filename.replace('.ts', '')} ?\n\nCette action est irréversible.`)) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/recordings/${username}/${filename}`, {
+          method: 'DELETE'
+        });
+        
+        if (res.ok) {
+          showNotification('Enregistrement supprimé', 'info');
+          // Supprimer aussi la progression
+          const key = `watch_progress_${username}_${filename}`;
+          localStorage.removeItem(key);
+          // Recharger la liste
+          loadRecordings();
+        } else {
+          showNotification('Erreur lors de la suppression', 'error');
+        }
+      } catch (e) {
+        console.error('Erreur suppression:', e);
+        showNotification('Erreur lors de la suppression', 'error');
+      }
     }
 
     // Switch entre onglets
@@ -780,6 +904,27 @@
         console.error('Erreur auto-start:', e);
       }
     }
+
+    // Sauvegarder la progression toutes les 10 secondes
+    const video = document.getElementById('player');
+    setInterval(() => {
+      if (currentRecordingFile && video.currentTime > 0 && video.duration > 0) {
+        saveWatchProgress(currentRecordingFile, video.currentTime, video.duration);
+      }
+    }, 10000);
+    
+    // Sauvegarder aussi à la pause ou en quittant la page
+    video.addEventListener('pause', () => {
+      if (currentRecordingFile && video.currentTime > 0 && video.duration > 0) {
+        saveWatchProgress(currentRecordingFile, video.currentTime, video.duration);
+      }
+    });
+    
+    window.addEventListener('beforeunload', () => {
+      if (currentRecordingFile && video.currentTime > 0 && video.duration > 0) {
+        saveWatchProgress(currentRecordingFile, video.currentTime, video.duration);
+      }
+    });
 
     // Initialisation
     updateModelStatus();
