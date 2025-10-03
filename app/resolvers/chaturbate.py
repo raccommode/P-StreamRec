@@ -8,6 +8,67 @@ from .base import ResolveError
 # Multiple API endpoints for fallback
 API_TEMPLATE = "https://chaturbate.com/api/chatvideocontext/{username}/"
 ROOM_STATUS_API = "https://roomlister.stream/api/rooms/{username}"
+ROOM_PAGE_URL = "https://chaturbate.com/{username}/"
+
+
+def extract_m3u8_from_page(username: str) -> Optional[str]:
+    """Extrait le M3U8 directement depuis la page HTML (méthode la plus fiable)."""
+    try:
+        url = ROOM_PAGE_URL.format(username=username)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://chaturbate.com/",
+        }
+        
+        resp = requests.get(url, headers=headers, timeout=15)
+        
+        if resp.status_code == 200:
+            html = resp.text
+            
+            # Méthode 1: Chercher dans les variables JavaScript
+            patterns = [
+                r'hls_source["\']?\s*:\s*["\']([^"\']+)["\']',
+                r'hlsSource["\']?\s*:\s*["\']([^"\']+)["\']',
+                r'm3u8["\']?\s*:\s*["\']([^"\']+)["\']',
+                r'stream_url["\']?\s*:\s*["\']([^"\']+)["\']',
+                r'playlist\.m3u8[?"]',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, html, re.IGNORECASE)
+                if match:
+                    if match.groups():
+                        m3u8_url = match.group(1)
+                    else:
+                        # Extraire l'URL complète autour du match
+                        context = html[max(0, match.start()-100):match.end()+100]
+                        url_match = re.search(r'https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*', context)
+                        if url_match:
+                            m3u8_url = url_match.group(0)
+                        else:
+                            continue
+                    
+                    # Nettoyer l'URL
+                    m3u8_url = m3u8_url.replace("\\/", "/").replace("\\", "")
+                    if m3u8_url.startswith("//"):
+                        m3u8_url = "https:" + m3u8_url
+                    
+                    # Vérifier que c'est une URL valide
+                    if m3u8_url.startswith("http") and ".m3u8" in m3u8_url:
+                        return m3u8_url
+            
+            # Méthode 2: Chercher toutes les URLs .m3u8 dans la page
+            all_m3u8 = re.findall(r'https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*', html)
+            if all_m3u8:
+                # Prendre la première URL trouvée
+                return all_m3u8[0].replace("\\/", "/")
+                
+    except Exception as e:
+        print(f"Erreur extraction page HTML: {e}")
+    
+    return None
 
 
 def get_room_info(username: str) -> Optional[Dict[str, Any]]:
@@ -34,6 +95,15 @@ def resolve_m3u8(username: str) -> str:
     if not username or not re.match(r'^[a-z0-9_]+$', username):
         raise ResolveError("Nom d'utilisateur invalide. Utilisez uniquement des lettres, chiffres et underscores.")
 
+    # MÉTHODE 1 (LA PLUS FIABLE): Extraire directement depuis la page HTML
+    print(f"🔍 Tentative d'extraction M3U8 depuis la page pour {username}...")
+    m3u8_from_page = extract_m3u8_from_page(username)
+    if m3u8_from_page:
+        print(f"✅ M3U8 trouvé via page HTML: {m3u8_from_page}")
+        return m3u8_from_page
+    
+    # MÉTHODE 2: Essayer l'API JSON
+    print(f"🔍 Tentative via API JSON pour {username}...")
     # Configuration des headers
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -47,7 +117,7 @@ def resolve_m3u8(username: str) -> str:
     if cookie:
         headers["Cookie"] = cookie
 
-    # Essayer d'abord l'API principale
+    # Essayer l'API principale
     url = API_TEMPLATE.format(username=username)
 
     try:
