@@ -148,32 +148,46 @@
     
     /* Container */
     .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
     }
     
     /* Video Player */
-    .video-container {
+    .player-container {
+      position: relative;
+      width: 100%;
       background: var(--bg-card);
       border-radius: 16px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
       border: 1px solid var(--border);
+      min-height: 400px;
     }
     
-    video {
+    .video-player {
       width: 100%;
       max-height: 70vh;
-      border-radius: 12px;
-      background: #000;
+      background: black;
+      display: block;
     }
     
-    .video-controls {
+    .player-container .empty-message {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 1;
+    }
+    
+    .player-container.has-video .empty-message {
+      opacity: 0;
+      pointer-events: none;
     }
     
     .control-btn {
@@ -606,6 +620,12 @@
         console.error('❌ Manifest toujours indisponible après 10 secondes');
         showNotification('Stream non disponible, réessayez dans quelques secondes', 'error');
         return;
+      }
+      
+      // Marquer le conteneur comme ayant une vidéo
+      const playerContainer = document.querySelector('.player-container');
+      if (playerContainer) {
+        playerContainer.classList.add('has-video');
       }
       
       if (video.canPlayType('application/vnd.apple.mpegurl')) {

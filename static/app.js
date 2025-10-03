@@ -182,6 +182,7 @@ async function renderModels() {
     
     const card = document.createElement('div');
     card.className = `model-card ${statusClass}`;
+    card.setAttribute('data-username', model.username);
     card.onclick = () => openModelPage(model.username);
     
     card.innerHTML = `
@@ -339,8 +340,59 @@ window.addEventListener('DOMContentLoaded', () => {
   // Afficher les modèles
   renderModels();
   
-  // Rafraîchir toutes les 15 secondes (moins agressif)
-  setInterval(renderModels, 15000);
+  // Rafraîchir uniquement les statuts toutes les 15 secondes (optimisé)
+  setInterval(async () => {
+    const sessions = await getActiveSessions();
+    const models = getModels();
+    
+    // Mettre à jour seulement les statuts sans recréer les cartes
+    for (const model of models) {
+      const modelInfo = await getModelInfo(model.username);
+      const isRecording = sessions.some(s => s.person === model.username && s.running);
+      
+      const card = document.querySelector(`[data-username="${model.username}"]`);
+      if (!card) continue;
+      
+      // Mettre à jour seulement les badges et statuts
+      const badge = card.querySelector('.badge');
+      const statusDot = card.querySelector('.status-dot');
+      const statusText = card.querySelector('.model-status');
+      
+      // Gérer les badges
+      if (isRecording && !badge) {
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'badge recording';
+        badgeEl.textContent = 'REC';
+        card.insertBefore(badgeEl, card.firstChild);
+      } else if (!isRecording && badge && badge.classList.contains('recording')) {
+        badge.remove();
+      }
+      
+      if (modelInfo.isOnline && !isRecording && !badge) {
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'badge live';
+        badgeEl.textContent = 'LIVE';
+        card.insertBefore(badgeEl, card.firstChild);
+      } else if (!modelInfo.isOnline && badge && badge.classList.contains('live')) {
+        badge.remove();
+      }
+      
+      // Mettre à jour le statut
+      if (statusDot) {
+        statusDot.className = `status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
+      }
+      if (statusText) {
+        statusText.innerHTML = `
+          <span class="status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}"></span>
+          ${isRecording ? 'En enregistrement' : modelInfo.isOnline ? 'En ligne' : 'Hors ligne'}
+          ${modelInfo.isOnline && modelInfo.viewers > 0 ? ` · ${modelInfo.viewers} viewers` : ''}
+        `;
+      }
+      
+      // Mettre à jour la classe de la carte
+      card.className = `model-card ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
+    }
+  }, 15000);
   
   // Vérifier et démarrer les enregistrements toutes les 60 secondes
   setInterval(checkAndStartRecordings, 60000);
