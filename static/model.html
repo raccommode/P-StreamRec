@@ -511,7 +511,7 @@
         <div class="quality-selector" id="qualitySelector" style="display: none;">
           <label for="qualitySelect">Qualité :</label>
           <select id="qualitySelect" onchange="changeQuality(this.value)">
-            <option value="-1">Auto</option>
+            <option value="-1">🎯 Meilleure</option>
           </select>
         </div>
         <div class="empty-message">
@@ -695,6 +695,7 @@
         hlsPlayer = new Hls({ 
           debug: false,
           enableWorker: false,
+          capLevelToPlayerSize: false,  // Ne pas limiter la qualité à la taille du lecteur
         });
         
         // Gestion des erreurs HLS
@@ -733,6 +734,14 @@
         
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('✅ Manifest chargé, démarrage lecture...');
+          
+          // FORCER LA MEILLEURE QUALITÉ
+          if (hlsPlayer.levels.length > 0) {
+            const highestLevel = hlsPlayer.levels.length - 1;
+            hlsPlayer.loadLevel = highestLevel;  // Forcer le niveau le plus élevé
+            hlsPlayer.autoLevelCapping = highestLevel;  // Limiter le plafond auto au max
+            console.log(`🎚️ Meilleure qualité forcée: ${hlsPlayer.levels[highestLevel].height}p`);
+          }
           
           // Afficher le sélecteur de qualité si plusieurs niveaux disponibles
           if (hlsPlayer.levels.length > 1) {
@@ -777,7 +786,7 @@
       const select = document.getElementById('qualitySelect');
       
       // Vider les options
-      select.innerHTML = '<option value="-1">Auto</option>';
+      select.innerHTML = '<option value="-1">🎯 Meilleure</option>';
       
       // Ajouter toutes les qualités disponibles
       hlsPlayer.levels.forEach((level, index) => {
@@ -807,12 +816,18 @@
       if (!hlsPlayer) return;
       
       const level = parseInt(levelIndex);
-      hlsPlayer.currentLevel = level;
       
       if (level === -1) {
-        console.log('🎚️ Mode Auto activé');
-        showNotification('Qualité: Auto', 'info');
+        // Mode Auto = Forcer la meilleure qualité disponible
+        const highestLevel = hlsPlayer.levels.length - 1;
+        hlsPlayer.loadLevel = highestLevel;
+        hlsPlayer.autoLevelCapping = highestLevel;
+        const bestLevel = hlsPlayer.levels[highestLevel];
+        const label = bestLevel.height ? `${bestLevel.height}p` : `${Math.round(bestLevel.bitrate / 1000)} kbps`;
+        console.log(`🎚️ Mode Auto: Meilleure qualité forcée (${label})`);
+        showNotification(`Qualité: Meilleure (${label})`, 'info');
       } else {
+        hlsPlayer.currentLevel = level;
         const selectedLevel = hlsPlayer.levels[level];
         const label = selectedLevel.height ? `${selectedLevel.height}p` : `${Math.round(selectedLevel.bitrate / 1000)} kbps`;
         console.log(`🎚️ Qualité sélectionnée: ${label}`);
