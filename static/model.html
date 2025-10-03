@@ -340,7 +340,9 @@
     .progress-text {
       font-size: 0.75rem;
       color: var(--text-secondary);
-      min-width: 35px;
+      min-width: 100px;
+      text-align: right;
+      white-space: nowrap;
     }
     
     .recording-actions {
@@ -732,6 +734,23 @@
             const progress = getWatchProgress(rec.filename);
             const progressPercent = progress ? Math.round((progress.position / progress.duration) * 100) : 0;
             
+            // Formater le temps de progression
+            let progressTimeStr = '';
+            if (progress && progress.position > 0) {
+              const pos = Math.floor(progress.position);
+              const dur = Math.floor(progress.duration);
+              
+              const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                if (h > 0) return `${h}h${m.toString().padStart(2, '0')}m`;
+                return `${m}m${s.toString().padStart(2, '0')}s`;
+              };
+              
+              progressTimeStr = `${formatTime(pos)} / ${formatTime(dur)}`;
+            }
+            
             return `
             <div class="recording-item">
               <img 
@@ -751,7 +770,7 @@
                     <div class="progress-bar">
                       <div class="progress-fill" style="width: ${progressPercent}%"></div>
                     </div>
-                    <span class="progress-text">${progressPercent}%</span>
+                    <span class="progress-text">${progressTimeStr}</span>
                   </div>
                 ` : ''}
               </div>
