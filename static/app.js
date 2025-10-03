@@ -112,15 +112,41 @@ async function renderModels() {
   }
   
   emptyState.style.display = 'none';
-  grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">Chargement des modèles...</p>';
+  
+  // Ne pas afficher "Chargement..." si la grille a déjà du contenu
+  if (grid.children.length === 0) {
+    grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">Chargement des modèles...</p>';
+  }
   
   // Récupérer les sessions actives
   const sessions = await getActiveSessions();
   
   // Charger les infos de chaque modèle
   const modelsInfo = await Promise.all(
-    models.map(model => getModelInfo(model.username))
+    models.map(async (model) => {
+      const info = await getModelInfo(model.username);
+      return {
+        ...info,
+        addedAt: model.addedAt
+      };
+    })
   );
+  
+  // Trier les modèles : Live en premier, puis par date de dernière diffusion
+  modelsInfo.sort((a, b) => {
+    // Les en enregistrement en premier
+    const aRecording = sessions.find(s => s.person === a.username && s.running);
+    const bRecording = sessions.find(s => s.person === b.username && s.running);
+    if (aRecording && !bRecording) return -1;
+    if (!aRecording && bRecording) return 1;
+    
+    // Puis les lives
+    if (a.isOnline && !b.isOnline) return -1;
+    if (!a.isOnline && b.isOnline) return 1;
+    
+    // Puis par date d'ajout (plus récent en premier)
+    return new Date(b.addedAt) - new Date(a.addedAt);
+  });
   
   grid.innerHTML = '';
   
@@ -227,6 +253,7 @@ async function checkAndStartRecordings() {
       const info = await getModelInfo(username);
       if (info.isOnline) {
         // Démarrer l'enregistrement automatiquement
+        console.log(`🔴 ${username} est en ligne, démarrage automatique...`);
         try {
           const res = await fetch('/api/start', {
             method: 'POST',
@@ -240,7 +267,12 @@ async function checkAndStartRecordings() {
           });
           
           if (res.ok) {
-            console.log(`✅ Enregistrement démarré pour ${username}`);
+            console.log(`✅ Enregistrement démarré automatiquement pour ${username}`);
+            // Rafraîchir immédiatement pour voir le changement
+            await renderModels();
+          } else {
+            const error = await res.json();
+            console.error(`❌ Erreur pour ${username}:`, error.detail);
           }
         } catch (e) {
           console.error(`❌ Erreur démarrage ${username}:`, e);

@@ -339,9 +339,14 @@
     // Récupérer l'état du modèle
     async function updateModelStatus() {
       try {
+        // Récupérer les sessions actives
         const res = await fetch('/api/status');
         const sessions = await res.json();
         const session = sessions.find(s => s.person === username);
+
+        // Récupérer le statut en ligne
+        const statusRes = await fetch(`/api/model/${username}/status`);
+        const modelInfo = statusRes.ok ? await statusRes.json() : { isOnline: false };
 
         if (session && session.running) {
           currentSession = session;
@@ -350,8 +355,14 @@
           document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
           document.getElementById('recordBtn').className = 'action-btn btn-stop';
           
-          // Charger le stream
+          // Charger le stream automatiquement
           loadStream(session.playback_url);
+        } else if (modelInfo.isOnline) {
+          currentSession = null;
+          document.getElementById('statusDot').className = 'status-dot online';
+          document.getElementById('statusText').textContent = 'En ligne';
+          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-record';
         } else {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot offline';
@@ -411,13 +422,23 @@
       
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
+        // Essayer de démarrer automatiquement
+        video.play().catch(e => console.log('Autoplay bloqué, cliquez sur play'));
       } else if (window.Hls && window.Hls.isSupported()) {
         if (hlsPlayer) {
           hlsPlayer.destroy();
         }
-        hlsPlayer = new Hls({ liveDurationInfinity: true });
+        hlsPlayer = new Hls({ 
+          liveDurationInfinity: true,
+          enableWorker: true,
+          lowLatencyMode: true
+        });
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
+        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+          // Essayer de démarrer automatiquement une fois le manifest chargé
+          video.play().catch(e => console.log('Autoplay bloqué, cliquez sur play'));
+        });
       } else {
         showNotification('HLS non supporté', 'error');
       }
@@ -475,9 +496,38 @@
       setTimeout(() => notif.remove(), 3000);
     }
 
+    // Démarrage automatique de l'enregistrement si en ligne
+    async function autoStartRecording() {
+      try {
+        const statusRes = await fetch(`/api/model/${username}/status`);
+        if (!statusRes.ok) return;
+        
+        const modelInfo = await statusRes.json();
+        
+        // Si le modèle est en ligne
+        if (modelInfo.isOnline) {
+          // Vérifier s'il n'y a pas déjà une session
+          const sessionsRes = await fetch('/api/status');
+          const sessions = await sessionsRes.json();
+          const existingSession = sessions.find(s => s.person === username && s.running);
+          
+          // Si pas de session, démarrer automatiquement
+          if (!existingSession) {
+            console.log(`🎬 Démarrage automatique de l'enregistrement pour ${username}`);
+            await toggleRecording();
+          }
+        }
+      } catch (e) {
+        console.error('Erreur auto-start:', e);
+      }
+    }
+
     // Initialisation
     updateModelStatus();
     loadRecordings();
+    
+    // Démarrer automatiquement l'enregistrement après un court délai
+    setTimeout(autoStartRecording, 2000);
     
     // Rafraîchir toutes les 5 secondes
     setInterval(updateModelStatus, 5000);
