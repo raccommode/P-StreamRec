@@ -66,39 +66,59 @@ async def model_page():
 
 @app.post("/api/start")
 async def api_start(body: StartBody):
+    print(f"\n{'='*60}")
+    print(f"🎯 REQUÊTE /api/start")
+    print(f"{'='*60}")
+    print(f"📥 Body: {body}")
+    
     target = (body.target or "").strip()
     if not target:
+        print(f"❌ Champ 'target' vide")
         raise HTTPException(status_code=400, detail="Champ 'target' requis")
+
+    print(f"🎯 Target: {target}")
+    print(f"🔖 Source type: {body.source_type}")
+    print(f"👤 Person: {body.person}")
+    print(f"📛 Name: {body.name}")
 
     m3u8_url: Optional[str] = None
     person: Optional[str] = (body.person or "").strip() or None
 
     # Determine source type
     stype = (body.source_type or "").lower().strip()
+    print(f"📌 Source type déterminé: {stype or 'auto'}")
 
     if stype == "m3u8" or target.startswith("http://") or target.startswith("https://"):
+        print(f"✅ URL M3U8 directe détectée")
         m3u8_url = target
     else:
+        print(f"🔍 Résolution Chaturbate requise...")
         # Try chaturbate if allowed or explicit
         if stype in ("", "chaturbate"):
             if not CB_RESOLVER_ENABLED:
+                print(f"❌ CB_RESOLVER_ENABLED est désactivé")
                 raise HTTPException(status_code=400, detail="Résolution Chaturbate désactivée. Fournissez une URL m3u8 directe ou activez CB_RESOLVER_ENABLED.")
             try:
+                print(f"🔄 Appel du resolver Chaturbate...")
                 from .resolvers.chaturbate import resolve_m3u8 as resolve_chaturbate
                 m3u8_url = resolve_chaturbate(target)
                 if not m3u8_url:
+                    print(f"❌ Resolver a retourné None")
                     raise HTTPException(status_code=400, detail=f"Impossible de trouver le flux pour {target}")
+                print(f"✅ M3U8 résolu: {m3u8_url}")
                 if not person:
                     person = target  # username
+                    print(f"👤 Person défini: {person}")
             except HTTPException:
                 raise
             except Exception as e:
                 import traceback
                 error_detail = f"Échec résolution Chaturbate pour {target}: {str(e)}"
-                print(f"ERROR: {error_detail}")
+                print(f"❌ ERROR: {error_detail}")
                 print(traceback.format_exc())
                 raise HTTPException(status_code=400, detail=error_detail)
         else:
+            print(f"❌ Source type invalide: {stype}")
             raise HTTPException(status_code=400, detail="source_type invalide. Utilisez 'm3u8' ou 'chaturbate'.")
 
     # If person still not set (direct m3u8), infer from URL
@@ -114,13 +134,24 @@ async def api_start(body: StartBody):
             person = "session"
 
     person = slugify(person)
+    print(f"🔖 Person slugifié: {person}")
+    print(f"\n🚀 Démarrage de la session FFmpeg...")
 
     try:
         sess = manager.start_session(m3u8_url, person=person, display_name=body.name)
+        print(f"✅ Session créée avec succès: {sess.id}")
     except RuntimeError as e:
+        print(f"❌ RuntimeError: {e}")
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
+        print(f"❌ Exception: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+
+    print(f"{'='*60}")
+    print(f"✅ SUCCÈS - Session {sess.id} démarrée")
+    print(f"{'='*60}\n")
 
     return {
         "id": sess.id,

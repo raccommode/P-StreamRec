@@ -78,17 +78,31 @@ class FFmpegManager:
         os.makedirs(self.records_root, exist_ok=True)
 
     def start_session(self, input_url: str, person: str, display_name: Optional[str] = None) -> FFmpegSession:
+        print(f"\n{'='*60}")
+        print(f"🎬 DÉMARRAGE SESSION FFMPEG")
+        print(f"{'='*60}")
+        print(f"👤 Personne: {person}")
+        print(f"🎯 Nom: {display_name or person}")
+        print(f"📺 URL: {input_url}")
+        
         with self._lock:
             # Prevent concurrent session for the same person to avoid TS conflicts
             for s in self._sessions.values():
                 if getattr(s, "person", None) == person and s.is_running():
+                    print(f"⚠️ Session déjà en cours pour {person}")
                     raise RuntimeError(f"Une session est déjà en cours pour '{person}'.")
 
             session_id = uuid.uuid4().hex[:10]
+            print(f"🆔 Session ID: {session_id}")
+            
             sessions_dir = os.path.join(self.sessions_root, session_id)
             os.makedirs(sessions_dir, exist_ok=True)
+            print(f"📁 Répertoire session: {sessions_dir}")
+            
             records_dir_for_person = os.path.join(self.records_root, person)
             os.makedirs(records_dir_for_person, exist_ok=True)
+            print(f"💾 Répertoire enregistrement: {records_dir_for_person}")
+            
             sess = FFmpegSession(session_id, input_url, sessions_dir, records_dir_for_person, person, display_name=display_name)
 
             # Build tee spec: one branch to stdout (pipe:1) as MPEG-TS, one for HLS playback
@@ -127,17 +141,33 @@ class FFmpegManager:
                 "-f", "tee", tee_spec,
             ]
 
+            print(f"\n🚀 Commande FFmpeg:")
+            print(f"   {' '.join(cmd)}")
+            print(f"📝 Logs FFmpeg: {sess.log_path}")
+            
             log_f = open(sess.log_path, "ab", buffering=0)
             try:
                 # Capture stdout for TS writer, keep logs on stderr
+                print(f"▶️ Lancement du processus FFmpeg...")
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log_f)
                 sess.process = proc
                 self._sessions[sess.id] = sess
+                
+                print(f"✅ Processus FFmpeg démarré (PID: {proc.pid})")
+                
                 # Start writer thread
                 t = threading.Thread(target=sess._writer_loop, name=f"ts-writer-{sess.id}", daemon=True)
                 sess._writer_thread = t
                 t.start()
-            except Exception:
+                
+                print(f"📼 Thread d'écriture TS démarré")
+                print(f"✅ Session {sess.id} prête")
+                print(f"{'='*60}\n")
+                
+            except Exception as e:
+                print(f"❌ Erreur démarrage FFmpeg: {e}")
+                import traceback
+                traceback.print_exc()
                 log_f.close()
                 raise
 
