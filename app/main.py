@@ -111,6 +111,8 @@ async def api_start(body: StartBody):
         sess = manager.start_session(m3u8_url, person=person, display_name=body.name)
     except RuntimeError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
     return {
         "id": sess.id,

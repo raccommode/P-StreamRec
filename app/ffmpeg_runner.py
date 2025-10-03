@@ -105,17 +105,25 @@ class FFmpegManager:
 
             cmd = [
                 self.ffmpeg_path,
-                "-nostdin", "-hide_banner", "-loglevel", "error",
+                "-nostdin", "-hide_banner", "-loglevel", "warning",
                 "-y",
-                "-fflags", "+genpts",
+                # Options de stabilité
+                "-fflags", "+genpts+discardcorrupt",
                 "-reconnect", "1",
                 "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "30",
+                "-reconnect_delay_max", "10",
+                "-reconnect_on_network_error", "1",
+                "-reconnect_on_http_error", "5xx",
+                # Input
                 "-i", sess.input_url,
-                "-map", "0:v:0", "-map", "0:a:0?",  # Sélectionner la première piste vidéo et audio
-                "-c", "copy",  # Copier sans re-encodage pour préserver la qualité
-                "-bsf:a", "aac_adtstoasc",  # Convertir AAC si nécessaire
-                "-movflags", "+faststart",  # Optimiser pour le streaming
+                # Mapping automatique (prend la meilleure qualité)
+                "-map", "0",
+                # Copie directe sans ré-encodage
+                "-c", "copy",
+                # Filtres pour stabilité
+                "-bsf:a", "aac_adtstoasc",
+                "-avoid_negative_ts", "make_zero",
+                # Output
                 "-f", "tee", tee_spec,
             ]
 

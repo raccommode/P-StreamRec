@@ -312,11 +312,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // Afficher les modèles
   renderModels();
   
-  // Rafraîchir toutes les 10 secondes
-  setInterval(renderModels, 10000);
+  // Rafraîchir toutes les 15 secondes (moins agressif)
+  setInterval(renderModels, 15000);
   
-  // Vérifier et démarrer les enregistrements toutes les 30 secondes
-  setInterval(checkAndStartRecordings, 30000);
+  // Vérifier et démarrer les enregistrements toutes les 60 secondes
+  setInterval(checkAndStartRecordings, 60000);
   checkAndStartRecordings(); // Premier check immédiat
   
   // Fermer la modal en cliquant en dehors
