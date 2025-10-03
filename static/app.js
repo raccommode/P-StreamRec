@@ -1,6 +1,7 @@
 async function startSession() {
   const target = document.getElementById('target').value.trim();
   const name = document.getElementById('name').value.trim() || null;
+  const person = (document.getElementById('person')?.value || '').trim() || null;
   if (!target) { alert('Veuillez saisir une URL m3u8 ou un nom.'); return; }
   const stype = (document.querySelector('input[name="stype"]:checked')?.value || 'auto');
   const source_type = stype === 'auto' ? null : stype;
@@ -8,7 +9,7 @@ async function startSession() {
   const res = await fetch('/api/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target, source_type, name })
+    body: JSON.stringify({ target, source_type, name, person })
   });
   if (!res.ok) {
     const err = await res.json().catch(()=>({detail: res.statusText}));

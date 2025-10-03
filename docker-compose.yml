@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  p-streamrec:
+    # Utiliser l'image locale construite depuis le Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: p-streamrec:latest
+    container_name: p-streamrec
+    environment:
+      - OUTPUT_DIR=/data
+      - PORT=${PORT:-8080}
+      - FFMPEG_PATH=ffmpeg
+      - HLS_TIME=${HLS_TIME:-4}
+      - HLS_LIST_SIZE=${HLS_LIST_SIZE:-6}
+      - CB_RESOLVER_ENABLED=${CB_RESOLVER_ENABLED:-false}
+      # - CB_COOKIE=session=...; autre=...   # Optionnel
+      - TZ=${TZ:-UTC}
+    ports:
+      - "${HOST_PORT:-8080}:${PORT:-8080}"
+    volumes:
+      - ${HOST_DATA_DIR:-./data}:/data
+    restart: unless-stopped
