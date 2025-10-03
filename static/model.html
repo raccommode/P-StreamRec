@@ -715,10 +715,20 @@
         const res = await fetch(`/api/recordings/${username}`);
         const data = await res.json();
         
-        if (data.recordings && data.recordings.length > 0) {
-          count.textContent = `${data.recordings.length} fichier${data.recordings.length > 1 ? 's' : ''}`;
+        // Filtrer les enregistrements: NE PAS afficher celui en cours (aujourd'hui)
+        const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+        const recordings = (data.recordings || []).filter(rec => {
+          // Si un enregistrement est en cours pour aujourd'hui, on ne l'affiche pas
+          if (currentSession && currentSession.running && rec.date === today) {
+            return false;
+          }
+          return true;
+        });
+        
+        if (recordings.length > 0) {
+          count.textContent = `${recordings.length} fichier${recordings.length > 1 ? 's' : ''}`;
           
-          list.innerHTML = data.recordings.map(rec => {
+          list.innerHTML = recordings.map(rec => {
             const progress = getWatchProgress(rec.filename);
             const progressPercent = progress ? Math.round((progress.position / progress.duration) * 100) : 0;
             

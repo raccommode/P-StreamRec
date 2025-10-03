@@ -112,37 +112,67 @@ async function renderModels() {
   }
   
   emptyState.style.display = 'none';
-  grid.innerHTML = '';
+  grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">⏳ Chargement...</p>';
   
   // Récupérer les sessions actives
   const sessions = await getActiveSessions();
   
-  // Créer les cartes une par une
-  for (const model of models) {
-    const modelInfo = await getModelInfo(model.username);
-    model.isOnline = modelInfo.isOnline;
-    model.thumbnail = modelInfo.thumbnail;
-    model.viewers = modelInfo.viewers;
-    
-    // Récupérer les enregistrements
-    let recordingsCount = 0;
-    let lastRecording = null;
-    try {
-      const recRes = await fetch(`/api/recordings/${model.username}`);
-      if (recRes.ok) {
-        const recData = await recRes.json();
+  // OPTIMISATION: Charger toutes les infos en PARALLÈLE
+  const modelsData = await Promise.all(
+    models.map(async (model) => {
+      const [modelInfo, recordingsRes] = await Promise.all([
+        getModelInfo(model.username),
+        fetch(`/api/recordings/${model.username}`).catch(() => null)
+      ]);
+      
+      let recordingsCount = 0;
+      let lastRecording = null;
+      
+      if (recordingsRes && recordingsRes.ok) {
+        const recData = await recordingsRes.json();
         recordingsCount = recData.recordings?.length || 0;
         if (recData.recordings && recData.recordings.length > 0) {
           lastRecording = recData.recordings[0].date;
         }
       }
-    } catch (e) {
-      console.log(`Pas d'enregistrements pour ${model.username}`);
-    }
+      
+      return {
+        username: model.username,
+        isOnline: modelInfo.isOnline,
+        thumbnail: modelInfo.thumbnail,
+        viewers: modelInfo.viewers,
+        recordingsCount,
+        lastRecording
+      };
+    })
+  );
+  
+  // TRI: par date de dernière diffusion puis alphabétique
+  modelsData.sort((a, b) => {
+    // D'abord par enregistrement actif
+    const aRecording = sessions.some(s => s.person === a.username && s.running);
+    const bRecording = sessions.some(s => s.person === b.username && s.running);
+    if (aRecording && !bRecording) return -1;
+    if (!aRecording && bRecording) return 1;
     
-    let statusClass = 'offline';
+    // Puis par date de dernière diffusion (plus récent d'abord)
+    if (a.lastRecording && b.lastRecording) {
+      if (a.lastRecording > b.lastRecording) return -1;
+      if (a.lastRecording < b.lastRecording) return 1;
+    } else if (a.lastRecording && !b.lastRecording) return -1;
+    else if (!a.lastRecording && b.lastRecording) return 1;
+    
+    // Enfin par ordre alphabétique
+    return a.username.localeCompare(b.username);
+  });
+  
+  // Vider et recréer les cartes
+  grid.innerHTML = '';
+  
+  for (const model of modelsData) {
     const isRecording = sessions.some(s => s.person === model.username && s.running);
     
+    let statusClass = 'offline';
     if (isRecording) {
       statusClass = 'recording';
     } else if (model.isOnline) {
@@ -170,10 +200,10 @@ async function renderModels() {
           ${isRecording ? 'En enregistrement' : model.isOnline ? 'En ligne' : 'Hors ligne'}
           ${model.isOnline && model.viewers > 0 ? ` · ${model.viewers} viewers` : ''}
         </div>
-        ${recordingsCount > 0 ? `
+        ${model.recordingsCount > 0 ? `
           <div class="model-recordings">
-            <span class="recordings-count">📁 ${recordingsCount} rediffusion${recordingsCount > 1 ? 's' : ''}</span>
-            ${lastRecording ? `<span class="last-recording">📅 Dernier: ${lastRecording}</span>` : ''}
+            <span class="recordings-count">📁 ${model.recordingsCount} rediffusion${model.recordingsCount > 1 ? 's' : ''}</span>
+            ${model.lastRecording ? `<span class="last-recording">📅 Dernier: ${model.lastRecording}</span>` : ''}
           </div>
         ` : ''}
       </div>
