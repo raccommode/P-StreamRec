@@ -294,13 +294,13 @@ async def get_thumbnail(username: str):
 
 @app.get("/api/recordings/{username}")
 async def list_recordings(username: str):
-    """Liste les enregistrements disponibles pour un modèle"""
-    import glob
-    import os
+    """Liste les enregistrements disponibles pour un modèle (optimisé avec cache)"""
+    import json
     from datetime import datetime
     
     records_dir = OUTPUT_DIR / "records" / username
     thumbnails_dir = OUTPUT_DIR / "thumbnails" / username
+    cache_file = OUTPUT_DIR / "records" / username / ".metadata_cache.json"
     
     if not records_dir.exists():
         return {"recordings": []}
@@ -308,22 +308,74 @@ async def list_recordings(username: str):
     # Créer le dossier thumbnails si nécessaire
     thumbnails_dir.mkdir(parents=True, exist_ok=True)
     
+    # Charger le cache
+    cache = {}
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'r') as f:
+                cache = json.load(f)
+        except:
+            cache = {}
+    
     # Trouver tous les fichiers .ts
     recordings = []
+    cache_updated = False
+    
     for ts_file in sorted(records_dir.glob("*.ts"), reverse=True):
         stat = ts_file.stat()
+        filename = ts_file.name
+        file_mtime = stat.st_mtime
         
-        # Générer miniature si elle n'existe pas
+        # Vérifier si les métadonnées sont en cache et à jour
+        if filename in cache and cache[filename].get('mtime') == file_mtime:
+            # Utiliser le cache
+            cached_data = cache[filename]
+            duration_seconds = cached_data.get('duration', 0)
+            duration_str = cached_data.get('duration_str', '0m00s')
+        else:
+            # Calculer la durée (en arrière-plan pour la prochaine fois)
+            duration_seconds = 0
+            try:
+                import subprocess
+                result = subprocess.run([
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    str(ts_file)
+                ], capture_output=True, text=True, timeout=3)
+                if result.returncode == 0 and result.stdout.strip():
+                    duration_seconds = int(float(result.stdout.strip()))
+            except:
+                pass
+            
+            # Formater la durée
+            hours = duration_seconds // 3600
+            minutes = (duration_seconds % 3600) // 60
+            seconds = duration_seconds % 60
+            if hours > 0:
+                duration_str = f"{hours}h{minutes:02d}m"
+            else:
+                duration_str = f"{minutes}m{seconds:02d}s"
+            
+            # Mettre en cache
+            cache[filename] = {
+                'duration': duration_seconds,
+                'duration_str': duration_str,
+                'mtime': file_mtime
+            }
+            cache_updated = True
+        
+        # Miniature
         thumb_path = thumbnails_dir / f"{ts_file.stem}.jpg"
         thumb_url = f"/api/recording-thumbnail/{username}/{ts_file.stem}.jpg"
         
-        if not thumb_path.exists() and ts_file.stat().st_size > 1024 * 1024:  # > 1MB
-            # Générer miniature en arrière-plan
+        # Générer miniature en arrière-plan si elle n'existe pas
+        if not thumb_path.exists() and stat.st_size > 1024 * 1024:
             import subprocess
             try:
                 subprocess.Popen([
                     FFMPEG_PATH, "-i", str(ts_file),
-                    "-ss", "00:00:10",  # À 10 secondes
+                    "-ss", "00:00:10",
                     "-vframes", "1",
                     "-vf", "scale=320:-1",
                     "-y",
@@ -332,41 +384,25 @@ async def list_recordings(username: str):
             except:
                 pass
         
-        # Obtenir la durée de la vidéo avec ffprobe
-        duration_seconds = 0
-        try:
-            import subprocess
-            result = subprocess.run([
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                str(ts_file)
-            ], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip():
-                duration_seconds = int(float(result.stdout.strip()))
-        except:
-            pass
-        
-        # Formater la durée
-        hours = duration_seconds // 3600
-        minutes = (duration_seconds % 3600) // 60
-        seconds = duration_seconds % 60
-        if hours > 0:
-            duration_str = f"{hours}h{minutes:02d}m"
-        else:
-            duration_str = f"{minutes}m{seconds:02d}s"
-        
         recordings.append({
-            "filename": ts_file.name,
+            "filename": filename,
             "date": ts_file.stem,
             "size": stat.st_size,
             "size_mb": round(stat.st_size / 1024 / 1024, 2),
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "url": f"/streams/records/{username}/{ts_file.name}",
+            "url": f"/streams/records/{username}/{filename}",
             "thumbnail": thumb_url if thumb_path.exists() else None,
             "duration": duration_seconds,
             "duration_str": duration_str
         })
+    
+    # Sauvegarder le cache si mis à jour
+    if cache_updated:
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump(cache, f)
+        except:
+            pass
     
     return {"recordings": recordings}
 
