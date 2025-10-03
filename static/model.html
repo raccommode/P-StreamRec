@@ -821,6 +821,17 @@
     // Lire un enregistrement
     function playRecording(url, filename) {
       console.log('📹 Lecture enregistrement:', url);
+      
+      // SÉCURITÉ: Empêcher la lecture de l'enregistrement du jour en cours
+      const today = new Date().toISOString().split('T')[0];
+      const recordingDate = filename.replace('.ts', '');
+      
+      if (currentSession && currentSession.running && recordingDate === today) {
+        showNotification('⚠️ Enregistrement en cours ! Regardez le live au lieu de la rediffusion.', 'error');
+        switchTab('live');
+        return;
+      }
+      
       const video = document.getElementById('player');
       
       // Arrêter le lecteur HLS si actif

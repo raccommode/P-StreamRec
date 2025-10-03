@@ -37,7 +37,50 @@ app.add_middleware(
 
 # Static mounts
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-app.mount("/streams", StaticFiles(directory=str(OUTPUT_DIR)), name="streams")
+
+# Route protégée pour les enregistrements
+@app.get("/streams/records/{username}/{filename}")
+async def serve_recording_protected(username: str, filename: str):
+    """Sert un enregistrement avec vérification qu'il n'est pas en cours"""
+    from fastapi.responses import FileResponse
+    from datetime import datetime
+    
+    # Sécurité: vérifier le nom de fichier
+    if ".." in filename or "/" in filename or not filename.endswith(".ts"):
+        raise HTTPException(status_code=400, detail="Nom de fichier invalide")
+    
+    # Vérifier que ce n'est pas l'enregistrement du jour en cours
+    today = datetime.now().strftime("%Y-%m-%d")
+    recording_date = filename.replace(".ts", "")
+    
+    # Vérifier si une session est active pour cet utilisateur
+    active_sessions = manager.list_status()
+    is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
+    
+    if is_recording and recording_date == today:
+        raise HTTPException(
+            status_code=403, 
+            detail="Cet enregistrement est en cours. Regardez le live à la place."
+        )
+    
+    # Servir le fichier
+    file_path = OUTPUT_DIR / "records" / username / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Enregistrement introuvable")
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type="video/mp2t",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "public, max-age=3600"
+        }
+    )
+
+# Mount pour les sessions HLS live uniquement
+app.mount("/streams/sessions", StaticFiles(directory=str(OUTPUT_DIR / "sessions")), name="streams_sessions")
+app.mount("/streams/thumbnails", StaticFiles(directory=str(OUTPUT_DIR / "thumbnails")), name="streams_thumbnails")
 
 manager = FFmpegManager(str(OUTPUT_DIR), ffmpeg_path=FFMPEG_PATH, hls_time=HLS_TIME, hls_list_size=HLS_LIST_SIZE)
 
@@ -463,12 +506,27 @@ async def get_recording_thumbnail(username: str, filename: str):
 
 @app.delete("/api/recordings/{username}/{filename}")
 async def delete_recording(username: str, filename: str):
-    """Supprime un enregistrement"""
+    """Supprime un enregistrement (sauf celui du jour en cours)"""
     from fastapi.responses import Response
+    from datetime import datetime
     
     # Sécurité
     if ".." in filename or "/" in filename or not filename.endswith(".ts"):
         raise HTTPException(status_code=400, detail="Nom invalide")
+    
+    # Vérifier que ce n'est pas l'enregistrement du jour en cours
+    today = datetime.now().strftime("%Y-%m-%d")
+    recording_date = filename.replace(".ts", "")
+    
+    # Vérifier si une session est active pour cet utilisateur
+    active_sessions = manager.list_status()
+    is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
+    
+    if is_recording and recording_date == today:
+        raise HTTPException(
+            status_code=403, 
+            detail="Impossible de supprimer l'enregistrement en cours."
+        )
     
     ts_path = OUTPUT_DIR / "records" / username / filename
     thumb_path = OUTPUT_DIR / "thumbnails" / username / f"{Path(filename).stem}.jpg"
