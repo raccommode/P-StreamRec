@@ -63,18 +63,21 @@
     }
     
     .add-btn {
-      width: 56px;
-      height: 56px;
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      flex-shrink: 0;
       border-radius: 50%;
       background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
       border: 2px solid rgba(255, 255, 255, 0.2);
       color: white;
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 300;
       line-height: 1;
       cursor: pointer;
       transition: all 0.3s ease;
-      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4), 0 0 0 0 rgba(139, 92, 246, 0.4);
+      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -91,6 +94,7 @@
       background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
       opacity: 0.5;
       animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      z-index: -1;
     }
     
     @keyframes pulse-ring {
@@ -105,7 +109,7 @@
     }
     
     .add-btn:hover {
-      transform: scale(1.15) rotate(90deg);
+      transform: scale(1.1) rotate(90deg);
       box-shadow: 0 12px 32px rgba(139, 92, 246, 0.6);
       border-color: rgba(255, 255, 255, 0.4);
     }
