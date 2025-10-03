@@ -1,16 +1,16 @@
 import os
+import re
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .ffmpeg_runner import FFmpegManager
-import re
-from urllib.parse import urlparse
 
 # Environment
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,11 +26,13 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="P-StreamRec", version="0.1.0")
 
+# Configuration CORS permissive pour Umbrel
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Autoriser toutes les origines
+    allow_credentials=False,  # Pas de credentials avec wildcard origin
+    allow_methods=["*"],  # Autoriser toutes les méthodes (GET, POST, etc.)
+    allow_headers=["*"],  # Autoriser tous les headers
 )
 
 # Static mounts
