@@ -155,17 +155,8 @@ async def get_model_status(username: str):
         if response.status_code == 200:
             data = response.json()
             
-            # Essayer différentes sources pour la miniature
-            thumbnail = (
-                data.get("room_image") or 
-                data.get("room_img") or
-                data.get("image_url") or
-                f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
-            )
-            
-            # S'assurer que l'URL est complète
-            if thumbnail.startswith("//"):
-                thumbnail = "https:" + thumbnail
+            # Utiliser le proxy local pour les miniatures
+            thumbnail = f"/api/thumbnail/{username}"
             
             return {
                 "username": username,
@@ -178,7 +169,7 @@ async def get_model_status(username: str):
             return {
                 "username": username,
                 "isOnline": False,
-                "thumbnail": f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+                "thumbnail": f"/api/thumbnail/{username}",
                 "viewers": 0
             }
     except Exception as e:
@@ -186,6 +177,64 @@ async def get_model_status(username: str):
         return {
             "username": username,
             "isOnline": False,
-            "thumbnail": f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
+            "thumbnail": f"/api/thumbnail/{username}",
             "viewers": 0
         }
+
+
+@app.get("/api/thumbnail/{username}")
+async def get_thumbnail(username: str):
+    """Proxy pour récupérer les miniatures Chaturbate"""
+    try:
+        import requests
+        from fastapi.responses import Response
+        
+        # Essayer d'abord l'API pour obtenir l'URL de l'image
+        api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        }
+        
+        try:
+            api_response = requests.get(api_url, headers=headers, timeout=5)
+            if api_response.status_code == 200:
+                data = api_response.json()
+                img_url = (
+                    data.get("room_image") or 
+                    data.get("room_img") or
+                    data.get("image_url") or
+                    f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
+                )
+            else:
+                img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
+        except:
+            img_url = f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg"
+        
+        # S'assurer que l'URL est complète
+        if img_url.startswith("//"):
+            img_url = "https:" + img_url
+        
+        # Récupérer l'image
+        img_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://chaturbate.com/",
+        }
+        
+        img_response = requests.get(img_url, headers=img_headers, timeout=10)
+        
+        if img_response.status_code == 200:
+            return Response(
+                content=img_response.content,
+                media_type=img_response.headers.get("content-type", "image/jpeg"),
+                headers={
+                    "Cache-Control": "public, max-age=300",  # Cache 5 minutes
+                }
+            )
+        else:
+            # Retourner une image placeholder
+            raise HTTPException(status_code=404, detail="Image non trouvée")
+            
+    except Exception as e:
+        # Image placeholder en cas d'erreur
+        raise HTTPException(status_code=404, detail=str(e))
