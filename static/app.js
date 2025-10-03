@@ -145,17 +145,35 @@ async function renderModels() {
     if (!a.isOnline && b.isOnline) return 1;
     
     // Puis par date d'ajout (plus récent en premier)
-    return new Date(b.addedAt) - new Date(a.addedAt);
   });
   
   grid.innerHTML = '';
   
-  modelsInfo.forEach(model => {
-    const session = sessions.find(s => s.person === model.username);
-    const isRecording = session && session.running;
+  for (const model of modelsInfo) {
+    const modelInfo = await getModelInfo(model.username);
+    model.isOnline = modelInfo.isOnline;
+    model.thumbnail = modelInfo.thumbnail;
+    model.viewers = modelInfo.viewers;
     
-    // Déterminer la classe de statut
+    // Récupérer les enregistrements
+    let recordingsCount = 0;
+    let lastRecording = null;
+    try {
+      const recRes = await fetch(`/api/recordings/${model.username}`);
+      if (recRes.ok) {
+        const recData = await recRes.json();
+        recordingsCount = recData.recordings?.length || 0;
+        if (recData.recordings && recData.recordings.length > 0) {
+          lastRecording = recData.recordings[0].date; // Le plus récent
+        }
+      }
+    } catch (e) {
+      console.log(`Pas d'enregistrements pour ${model.username}`);
+    }
+    
     let statusClass = 'offline';
+    const isRecording = sessions.some(s => s.person === model.username && s.running);
+    
     if (isRecording) {
       statusClass = 'recording';
     } else if (model.isOnline) {
@@ -182,11 +200,17 @@ async function renderModels() {
           ${isRecording ? 'En enregistrement' : model.isOnline ? 'En ligne' : 'Hors ligne'}
           ${model.isOnline && model.viewers > 0 ? ` · ${model.viewers} viewers` : ''}
         </div>
+        ${recordingsCount > 0 ? `
+          <div class="model-recordings">
+            <span class="recordings-count">📁 ${recordingsCount} rediffusion${recordingsCount > 1 ? 's' : ''}</span>
+            ${lastRecording ? `<span class="last-recording">📅 Dernier: ${lastRecording}</span>` : ''}
+          </div>
+        ` : ''}
       </div>
     `;
     
     grid.appendChild(card);
-  });
+  }
 }
 
 // ============================================
