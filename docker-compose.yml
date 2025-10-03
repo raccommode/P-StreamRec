@@ -14,7 +14,7 @@ services:
       - FFMPEG_PATH=ffmpeg
       - HLS_TIME=${HLS_TIME:-4}
       - HLS_LIST_SIZE=${HLS_LIST_SIZE:-6}
-      - CB_RESOLVER_ENABLED=${CB_RESOLVER_ENABLED:-false}
+      - CB_RESOLVER_ENABLED=${CB_RESOLVER_ENABLED:-true}
       # - CB_COOKIE=session=...; autre=...   # Optionnel
       - TZ=${TZ:-UTC}
     ports:
