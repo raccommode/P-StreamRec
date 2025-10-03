@@ -227,12 +227,53 @@ async def get_model_status(username: str):
 
 @app.get("/api/thumbnail/{username}")
 async def get_thumbnail(username: str):
-    """Proxy pour récupérer les miniatures Chaturbate"""
+    """Génère miniature depuis le flux HLS si disponible, sinon fallback Chaturbate"""
     import requests
-    from fastapi.responses import Response
+    from fastapi.responses import FileResponse, Response
+    import subprocess
+    import time
     
+    # Dossier pour les miniatures live
+    live_thumbs_dir = OUTPUT_DIR / "thumbnails" / "live"
+    live_thumbs_dir.mkdir(parents=True, exist_ok=True)
+    thumb_path = live_thumbs_dir / f"{username}.jpg"
+    
+    # Vérifier si une session HLS est active pour ce username
+    active_sessions = manager.list_status()
+    session = next((s for s in active_sessions if s.get('person') == username and s.get('running')), None)
+    
+    # Si session active et miniature n'existe pas ou ancienne (>5min), générer depuis le stream
+    if session:
+        needs_update = not thumb_path.exists() or (time.time() - thumb_path.stat().st_mtime > 300)
+        
+        if needs_update:
+            # Trouver le fichier M3U8 de la session
+            session_dir = OUTPUT_DIR / "sessions" / session['id']
+            m3u8_file = session_dir / "stream.m3u8"
+            
+            if m3u8_file.exists():
+                try:
+                    # Capturer une frame depuis le stream HLS
+                    subprocess.run([
+                        FFMPEG_PATH, "-i", str(m3u8_file),
+                        "-vframes", "1",
+                        "-vf", "scale=280:-1",
+                        "-y",
+                        str(thumb_path)
+                    ], capture_output=True, timeout=5, check=False)
+                except:
+                    pass
+        
+        # Retourner la miniature générée si elle existe
+        if thumb_path.exists():
+            return FileResponse(
+                path=str(thumb_path),
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=60"}
+            )
+    
+    # Fallback: essayer Chaturbate
     try:
-        # Essayer plusieurs URLs de miniatures Chaturbate
         img_urls = [
             f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
             f"https://cbjpeg.stream.highwebmedia.com/stream?room={username}&f=.jpg",
@@ -243,53 +284,39 @@ async def get_thumbnail(username: str):
             "Referer": "https://chaturbate.com/",
         }
         
-        # Essayer chaque URL
         for img_url in img_urls:
             try:
-                response = requests.get(img_url, headers=headers, timeout=5, allow_redirects=True)
+                response = requests.get(img_url, headers=headers, timeout=3, allow_redirects=True)
                 
-                if response.status_code == 200 and len(response.content) > 1000:  # Image valide
+                if response.status_code == 200 and len(response.content) > 1000:
                     return Response(
                         content=response.content,
                         media_type="image/jpeg",
-                        headers={
-                            "Cache-Control": "public, max-age=300",
-                        }
+                        headers={"Cache-Control": "public, max-age=60"}
                     )
             except:
                 continue
-        
-        # Si aucune image trouvée, retourner SVG gradient moderne
-        svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
-            <defs>
-                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <rect fill="url(#grad)" width="280" height="200"/>
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="18" font-weight="600">{username}</text>
-            <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="12" opacity="0.8">📷 Miniature indisponible</text>
-        </svg>'''
-        
-        return Response(
-            content=svg_placeholder,
-            media_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=60"}
-        )
-            
-    except Exception as e:
-        # SVG placeholder en cas d'erreur
-        svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
-            <rect fill="#1a1f3a" width="280" height="200"/>
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#a0aec0" font-family="system-ui" font-size="16">{username}</text>
-        </svg>'''
-        
-        return Response(
-            content=svg_placeholder,
-            media_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=60"}
-        )
+    except:
+        pass
+    
+    # SVG placeholder si tout échoue
+    svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
+        <defs>
+            <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+            </linearGradient>
+        </defs>
+        <rect fill="url(#grad)" width="280" height="200"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="18" font-weight="600">{username}</text>
+        <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="12" opacity="0.8">📷 Chargement...</text>
+    </svg>'''
+    
+    return Response(
+        content=svg_placeholder,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=10"}
+    )
 
 
 @app.get("/api/recordings/{username}")
