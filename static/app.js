@@ -16,6 +16,24 @@ async function getModels() {
   return [];
 }
 
+// Extraire le username depuis une URL Chaturbate
+function extractUsername(url) {
+  if (!url) return null;
+  
+  // Si c'est juste un username
+  if (!url.includes('/') && !url.includes('.')) {
+    return url.toLowerCase().trim();
+  }
+  
+  // Extraire depuis URL chaturbate.com/username
+  const match = url.match(/chaturbate\.com\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    return match[1].toLowerCase().trim();
+  }
+  
+  return null;
+}
+
 // ============================================
 // Modal
 // ============================================

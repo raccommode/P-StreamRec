@@ -1,15 +1,16 @@
-import os
 import re
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
+import os
+import asyncio
+import requests
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
 from .ffmpeg_runner import FFmpegManager
 
 # Environment
@@ -609,3 +610,79 @@ async def delete_recording(username: str, filename: str):
         return {"success": True, "message": f"{filename} supprimé"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# Background Task - Auto-enregistrement
+# ============================================
+
+async def auto_record_task():
+    """Vérifie automatiquement les modèles et lance les enregistrements"""
+    while True:
+        try:
+            await asyncio.sleep(120)  # Vérifier toutes les 2 minutes
+            
+            # Charger les modèles
+            models = load_models()
+            if not models:
+                continue
+            
+            # Récupérer les sessions actives
+            active_sessions = manager.list_status()
+            
+            for model in models:
+                username = model.get('username')
+                if not username:
+                    continue
+                
+                # Vérifier si déjà en enregistrement
+                is_recording = any(
+                    s.get('person') == username and s.get('running')
+                    for s in active_sessions
+                )
+                
+                if is_recording:
+                    continue  # Déjà en cours
+                
+                # Vérifier si le modèle est en ligne
+                try:
+                    # Utiliser l'API Chaturbate
+                    api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": "https://chaturbate.com/",
+                    }
+                    
+                    resp = requests.get(api_url, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        hls_source = data.get('hls_source')
+                        
+                        if hls_source:
+                            # Modèle en ligne avec flux HLS disponible
+                            print(f"🔴 Auto-démarrage enregistrement: {username}")
+                            
+                            # Lancer l'enregistrement
+                            session_id = manager.start(
+                                stream_url=hls_source,
+                                display_name=username,
+                                person=username
+                            )
+                            
+                            if session_id:
+                                print(f"✅ Enregistrement démarré: {username} (ID: {session_id})")
+                            
+                except Exception as e:
+                    print(f"Erreur vérification {username}: {e}")
+                    continue
+                
+        except Exception as e:
+            print(f"Erreur auto-record task: {e}")
+            await asyncio.sleep(60)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Démarre le background task au démarrage de l'application"""
+    asyncio.create_task(auto_record_task())
+    print("🚀 Background task auto-enregistrement démarré")
