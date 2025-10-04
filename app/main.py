@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import os
 import asyncio
 import requests
+import json
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -126,6 +127,19 @@ def slugify(value: str) -> str:
 @app.get("/")
 async def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Retourne un favicon SVG simple"""
+    from fastapi.responses import Response
+    svg_favicon = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="#6366f1"/>
+        <circle cx="50" cy="35" r="8" fill="white"/>
+        <rect x="35" y="45" width="30" height="35" rx="5" fill="white"/>
+        <rect x="42" y="52" width="16" height="20" fill="#6366f1"/>
+    </svg>'''
+    return Response(content=svg_favicon, media_type="image/svg+xml")
 
 
 @app.get("/model.html")
