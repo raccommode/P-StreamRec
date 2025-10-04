@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migration des modèles</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .card {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #6366f1;
+      margin-top: 0;
+    }
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #334155;
+    }
+    .success {
+      background: #10b981;
+      color: white;
+    }
+    .error {
+      background: #ef4444;
+      color: white;
+    }
+    .info {
+      background: #3b82f6;
+      color: white;
+    }
+    .model-list {
+      margin-top: 20px;
+      padding: 12px;
+      background: #334155;
+      border-radius: 8px;
+    }
+    .model-item {
+      padding: 8px;
+      margin: 4px 0;
+      background: #1e293b;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔄 Migration des modèles</h1>
+    <p>Cette page permet de migrer vos modèles sauvegardés dans le navigateur (localStorage) vers le serveur Docker.</p>
+    
+    <div id="status"></div>
+    
+    <div id="modelList"></div>
+    
+    <button id="migrateBtn" onclick="migrateModels()">Migrer les modèles</button>
+    <button onclick="window.location.href='/'" style="background: #64748b; margin-left: 10px;">Retour à l'accueil</button>
+  </div>
+
+  <script>
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+
+    function displayLocalModels() {
+      const models = JSON.parse(localStorage.getItem('chaturbate_models') || '[]');
+      const listDiv = document.getElementById('modelList');
+      
+      if (models.length === 0) {
+        listDiv.innerHTML = '<p style="color: #94a3b8;">Aucun modèle trouvé dans le navigateur.</p>';
+        document.getElementById('migrateBtn').disabled = true;
+        return;
+      }
+      
+      listDiv.innerHTML = `
+        <div class="model-list">
+          <strong>Modèles trouvés (${models.length}) :</strong>
+          ${models.map(m => `<div class="model-item">📺 ${m.username}</div>`).join('')}
+        </div>
+      `;
+    }
+
+    async function migrateModels() {
+      const models = JSON.parse(localStorage.getItem('chaturbate_models') || '[]');
+      
+      if (models.length === 0) {
+        showStatus('Aucun modèle à migrer', 'info');
+        return;
+      }
+
+      showStatus(`Migration de ${models.length} modèle(s) en cours...`, 'info');
+      document.getElementById('migrateBtn').disabled = true;
+
+      let migrated = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const model of models) {
+        try {
+          const res = await fetch('/api/models', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(model)
+          });
+
+          if (res.ok) {
+            migrated++;
+          } else if (res.status === 409) {
+            skipped++; // Déjà existant
+          } else {
+            errors++;
+          }
+        } catch (e) {
+          console.error('Erreur migration:', e);
+          errors++;
+        }
+      }
+
+      if (errors === 0) {
+        showStatus(
+          `✅ Migration terminée ! ${migrated} modèle(s) migré(s), ${skipped} déjà existant(s).`,
+          'success'
+        );
+        
+        // Optionnel: nettoyer le localStorage
+        if (confirm('Migration réussie ! Voulez-vous nettoyer les anciennes données du navigateur ?')) {
+          localStorage.removeItem('chaturbate_models');
+          showStatus('✅ Migration terminée et localStorage nettoyé !', 'success');
+          displayLocalModels();
+        }
+      } else {
+        showStatus(
+          `⚠️ Migration avec erreurs: ${migrated} OK, ${skipped} déjà existants, ${errors} erreurs`,
+          'error'
+        );
+        document.getElementById('migrateBtn').disabled = false;
+      }
+    }
+
+    // Afficher les modèles au chargement
+    displayLocalModels();
+  </script>
+</body>
+</html>
