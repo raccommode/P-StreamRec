@@ -84,6 +84,29 @@ app.mount("/streams/thumbnails", StaticFiles(directory=str(OUTPUT_DIR / "thumbna
 
 manager = FFmpegManager(str(OUTPUT_DIR), ffmpeg_path=FFMPEG_PATH, hls_time=HLS_TIME, hls_list_size=HLS_LIST_SIZE)
 
+# Fichier de sauvegarde des modèles (côté serveur)
+MODELS_FILE = OUTPUT_DIR / "models.json"
+
+def load_models():
+    """Charge la liste des modèles depuis le fichier JSON"""
+    if MODELS_FILE.exists():
+        try:
+            with open(MODELS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_models_to_file(models):
+    """Sauvegarde la liste des modèles dans le fichier JSON"""
+    try:
+        with open(MODELS_FILE, 'w') as f:
+            json.dump(models, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Erreur sauvegarde modèles: {e}")
+        return False
+
 
 class StartBody(BaseModel):
     target: str  # Either an m3u8 URL or a username (if resolver enabled)
@@ -502,6 +525,50 @@ async def get_recording_thumbnail(username: str, filename: str):
     </svg>'''
     
     return Response(content=svg, media_type="image/svg+xml")
+
+
+@app.get("/api/models")
+async def get_models():
+    """Récupère la liste des modèles sauvegardés"""
+    models = load_models()
+    return {"models": models}
+
+
+@app.post("/api/models")
+async def add_model(model: dict):
+    """Ajoute un modèle à la liste"""
+    models = load_models()
+    
+    # Vérifier si le modèle existe déjà
+    username = model.get('username')
+    if not username:
+        raise HTTPException(status_code=400, detail="Username requis")
+    
+    # Éviter les doublons
+    if any(m.get('username') == username for m in models):
+        raise HTTPException(status_code=409, detail="Modèle déjà existant")
+    
+    models.append(model)
+    
+    if save_models_to_file(models):
+        return {"success": True, "models": models}
+    else:
+        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
+
+
+@app.delete("/api/models/{username}")
+async def delete_model(username: str):
+    """Supprime un modèle de la liste"""
+    models = load_models()
+    filtered = [m for m in models if m.get('username') != username]
+    
+    if len(filtered) == len(models):
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+    
+    if save_models_to_file(filtered):
+        return {"success": True, "models": filtered}
+    else:
+        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
 
 
 @app.delete("/api/recordings/{username}/{filename}")

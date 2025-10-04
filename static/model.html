@@ -1031,17 +1031,26 @@
     }
 
     // Supprimer le modèle
-    function deleteModel() {
+    async function deleteModel() {
       if (!confirm(`Voulez-vous vraiment supprimer ${username} de votre liste ?`)) {
         return;
       }
       
-      const models = JSON.parse(localStorage.getItem('chaturbate_models') || '[]');
-      const filtered = models.filter(m => m.username !== username);
-      localStorage.setItem('chaturbate_models', JSON.stringify(filtered));
-      
-      showNotification('Modèle supprimé');
-      setTimeout(() => window.location.href = '/', 1000);
+      try {
+        const res = await fetch(`/api/models/${username}`, {
+          method: 'DELETE'
+        });
+        
+        if (res.ok) {
+          showNotification('Modèle supprimé');
+          setTimeout(() => window.location.href = '/', 1000);
+        } else {
+          showNotification('Erreur lors de la suppression', 'error');
+        }
+      } catch (e) {
+        console.error('Erreur suppression modèle:', e);
+        showNotification('Erreur de connexion', 'error');
+      }
     }
 
     // Notification

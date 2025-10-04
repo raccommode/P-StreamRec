@@ -2,19 +2,18 @@
 // Gestion du LocalStorage pour les modèles
 // ============================================
 
-function getModels() {
-  const models = localStorage.getItem('chaturbate_models');
-  return models ? JSON.parse(models) : [];
-}
-
-function saveModels(models) {
-  localStorage.setItem('chaturbate_models', JSON.stringify(models));
-}
-
-function extractUsername(url) {
-  // Extraire le username depuis une URL Chaturbate
-  const match = url.match(/chaturbate\.com\/([^\/\?]+)/);
-  return match ? match[1].toLowerCase() : url.toLowerCase();
+// Charger les modèles depuis le serveur
+async function getModels() {
+  try {
+    const res = await fetch('/api/models');
+    if (res.ok) {
+      const data = await res.json();
+      return data.models || [];
+    }
+  } catch (e) {
+    console.error('Erreur chargement modèles:', e);
+  }
+  return [];
 }
 
 // ============================================
@@ -46,24 +45,36 @@ async function addModel(event) {
     return;
   }
   
-  const models = getModels();
-  
-  // Vérifier si le modèle existe déjà
-  if (models.find(m => m.username === username)) {
-    showNotification('Ce modèle est déjà dans la liste', 'error');
-    return;
+  try {
+    // Ajouter le modèle via l'API serveur
+    const res = await fetch('/api/models', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: username,
+        addedAt: new Date().toISOString()
+      })
+    });
+    
+    if (res.status === 409) {
+      showNotification('Ce modèle est déjà dans la liste', 'error');
+      return;
+    }
+    
+    if (!res.ok) {
+      showNotification('Erreur lors de l\'ajout', 'error');
+      return;
+    }
+    
+    closeAddModal();
+    showNotification(`${username} ajouté avec succès!`, 'success');
+    renderModels();
+  } catch (e) {
+    console.error('Erreur ajout modèle:', e);
+    showNotification('Erreur de connexion', 'error');
   }
-  
-  // Ajouter le modèle
-  models.push({
-    username: username,
-    addedAt: new Date().toISOString()
-  });
-  
-  saveModels(models);
-  closeAddModal();
-  showNotification(`${username} ajouté avec succès!`, 'success');
-  renderModels();
 }
 
 // ============================================
@@ -101,7 +112,7 @@ async function getModelInfo(username) {
 // ============================================
 
 async function renderModels() {
-  const models = getModels();
+  const models = await getModels();
   const grid = document.getElementById('modelsGrid');
   const emptyState = document.getElementById('emptyState');
   
@@ -272,7 +283,7 @@ function showNotification(message, type = 'success') {
 // ============================================
 
 async function checkAndStartRecordings() {
-  const models = getModels();
+  const models = await getModels();
   const sessions = await getActiveSessions();
   
   for (const model of models) {
