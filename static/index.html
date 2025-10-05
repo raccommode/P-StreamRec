@@ -418,19 +418,6 @@
   <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script defer src="/static/app.js"></script>
-  <script>
-    // Charger la version depuis l'API (synchronisée avec version.json)
-    (async function loadVersion() {
-      try {
-        const res = await fetch('/api/version');
-        const data = await res.json();
-        document.getElementById('appVersion').textContent = `v${data.version}`;
-      } catch (e) {
-        console.error('Erreur chargement version:', e);
-        document.getElementById('appVersion').textContent = 'v?.?.?';
-      }
-    })();
-  </script>
 </head>
 <body>
   <header class="header">
@@ -512,5 +499,19 @@
       </form>
     </div>
   </div>
+  
+  <script>
+    // Charger la version depuis l'API (synchronisée avec version.json)
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        document.getElementById('appVersion').textContent = `v${data.version}`;
+      } catch (e) {
+        console.error('Erreur chargement version:', e);
+        document.getElementById('appVersion').textContent = 'v?.?.?';
+      }
+    });
+  </script>
 </body>
 </html>
