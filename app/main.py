@@ -716,8 +716,78 @@ async def auto_record_task():
             await asyncio.sleep(60)
 
 
+async def cleanup_old_recordings_task():
+    """Nettoie automatiquement les anciennes rediffusions selon la rétention configurée"""
+    from datetime import datetime, timedelta
+    
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Vérifier toutes les heures
+            
+            print("🧹 Nettoyage des anciennes rediffusions...")
+            
+            # Charger les modèles avec leurs paramètres de rétention
+            models = load_models()
+            
+            for model in models:
+                username = model.get('username')
+                retention_days = model.get('retentionDays', 30)  # Défaut 30 jours
+                
+                if not username:
+                    continue
+                
+                records_dir = OUTPUT_DIR / "records" / username
+                thumbnails_dir = OUTPUT_DIR / "thumbnails" / username
+                
+                if not records_dir.exists():
+                    continue
+                
+                # Date limite (aujourd'hui - rétention)
+                cutoff_date = datetime.now() - timedelta(days=retention_days)
+                
+                # Parcourir les fichiers .ts
+                for ts_file in records_dir.glob("*.ts"):
+                    try:
+                        # Le nom du fichier est au format YYYY-MM-DD.ts
+                        date_str = ts_file.stem  # Enlève .ts
+                        file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                        
+                        # Si le fichier est plus vieux que la limite
+                        if file_date < cutoff_date:
+                            # Supprimer le fichier TS
+                            ts_file.unlink()
+                            print(f"🗑️ Supprimé: {username}/{ts_file.name} (>{retention_days} jours)")
+                            
+                            # Supprimer la miniature associée
+                            thumb_file = thumbnails_dir / f"{ts_file.stem}.jpg"
+                            if thumb_file.exists():
+                                thumb_file.unlink()
+                            
+                            # Supprimer l'entrée du cache
+                            cache_file = records_dir / ".metadata_cache.json"
+                            if cache_file.exists():
+                                try:
+                                    with open(cache_file, 'r') as f:
+                                        cache = json.load(f)
+                                    if ts_file.name in cache:
+                                        del cache[ts_file.name]
+                                        with open(cache_file, 'w') as f:
+                                            json.dump(cache, f)
+                                except:
+                                    pass
+                                    
+                    except Exception as e:
+                        print(f"Erreur nettoyage {ts_file.name}: {e}")
+                        continue
+                        
+        except Exception as e:
+            print(f"Erreur cleanup task: {e}")
+            await asyncio.sleep(3600)
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Démarre le background task au démarrage de l'application"""
+    """Démarre les background tasks au démarrage de l'application"""
     asyncio.create_task(auto_record_task())
-    print("🚀 Background task auto-enregistrement démarré")
+    asyncio.create_task(cleanup_old_recordings_task())
+    print("🚀 Background tasks démarrés: auto-enregistrement + nettoyage")

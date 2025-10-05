@@ -472,6 +472,37 @@
             required
           />
         </div>
+        
+        <div class="form-group">
+          <label for="recordQuality">Qualité d'enregistrement</label>
+          <select id="recordQuality" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 1rem;">
+            <option value="best">🎯 Meilleure qualité (défaut)</option>
+            <option value="1080p">1080p (Full HD)</option>
+            <option value="720p">720p (HD)</option>
+            <option value="480p">480p (SD)</option>
+            <option value="360p">360p (Faible)</option>
+          </select>
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Qualité du flux enregistré (plus élevé = plus d'espace disque)
+          </small>
+        </div>
+        
+        <div class="form-group">
+          <label for="retentionDays">Durée de conservation (jours)</label>
+          <input 
+            type="number" 
+            id="retentionDays"
+            min="1"
+            max="365"
+            value="30"
+            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 1rem;"
+            required
+          />
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Les rediffusions plus anciennes seront automatiquement supprimées (défaut: 30 jours)
+          </small>
+        </div>
+        
         <div class="modal-actions">
           <button type="button" class="btn-secondary" onclick="closeAddModal()" data-i18n="cancel">Annuler</button>
           <button type="submit" class="btn-primary" data-i18n="add">Ajouter</button>

@@ -57,6 +57,8 @@ async function addModel(event) {
   
   const url = document.getElementById('modelUrl').value.trim();
   const username = extractUsername(url);
+  const quality = document.getElementById('recordQuality').value;
+  const retentionDays = parseInt(document.getElementById('retentionDays').value);
   
   if (!username) {
     showNotification('URL invalide', 'error');
@@ -72,7 +74,9 @@ async function addModel(event) {
       },
       body: JSON.stringify({
         username: username,
-        addedAt: new Date().toISOString()
+        addedAt: new Date().toISOString(),
+        recordQuality: quality,
+        retentionDays: retentionDays
       })
     });
     

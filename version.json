@@ -1,11 +1,14 @@
 {
-  "version": "1.0.0",
+  "version": "2025.40.A",
   "releaseDate": "2025-10-05",
   "changelog": [
     "Auto-enregistrement en arrière-plan",
     "Sauvegarde serveur (navigation privée OK)",
     "Cache métadonnées rediffusions",
     "Sélecteur de qualité HLS",
-    "Protection enregistrement en cours"
+    "Protection enregistrement en cours",
+    "Qualité d'enregistrement configurable",
+    "Rétention automatique des rediffusions",
+    "Système de version ANNÉE.SEMAINE.LETTRE"
   ]
 }
