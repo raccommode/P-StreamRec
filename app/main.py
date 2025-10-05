@@ -47,8 +47,11 @@ async def serve_recording_protected(username: str, filename: str):
     from fastapi.responses import FileResponse
     from datetime import datetime
     
+    print(f"📹 Demande lecture: {username}/{filename}")
+    
     # Sécurité: vérifier le nom de fichier
     if ".." in filename or "/" in filename or not filename.endswith(".ts"):
+        print(f"❌ Nom de fichier invalide: {filename}")
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     
     # Vérifier que ce n'est pas l'enregistrement du jour en cours
@@ -60,6 +63,7 @@ async def serve_recording_protected(username: str, filename: str):
     is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
     
     if is_recording and recording_date == today:
+        print(f"⚠️ Enregistrement en cours bloqué: {filename}")
         raise HTTPException(
             status_code=403, 
             detail="Cet enregistrement est en cours. Regardez le live à la place."
@@ -69,14 +73,18 @@ async def serve_recording_protected(username: str, filename: str):
     file_path = OUTPUT_DIR / "records" / username / filename
     
     if not file_path.exists():
+        print(f"❌ Fichier introuvable: {file_path}")
         raise HTTPException(status_code=404, detail="Enregistrement introuvable")
+    
+    print(f"✅ Envoi fichier: {file_path} ({file_path.stat().st_size / 1024 / 1024:.2f} MB)")
     
     return FileResponse(
         path=str(file_path),
         media_type="video/mp2t",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
-            "Cache-Control": "public, max-age=3600"
+            "Cache-Control": "public, max-age=3600",
+            "Accept-Ranges": "bytes"  # Important pour la lecture vidéo
         }
     )
 
