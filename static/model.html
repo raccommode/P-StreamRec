@@ -960,6 +960,7 @@
       }
       
       const video = document.getElementById('player');
+      const container = document.querySelector('.player-container');
       
       // Arrêter le lecteur HLS si actif
       if (hlsPlayer) {
@@ -967,24 +968,37 @@
         hlsPlayer = null;
       }
       
+      // Masquer le sélecteur de qualité (pas de HLS pour les rediffusions)
+      document.getElementById('qualitySelector').style.display = 'none';
+      
       currentRecordingFile = filename;
+      
+      // Afficher le conteneur vidéo
+      container.classList.add('has-video');
       
       // Charger la vidéo directement
       video.src = url;
+      video.load();  // Force le chargement
       
       // Reprendre à la position sauvegardée
       const progress = getWatchProgress(filename);
       if (progress && progress.position > 10) {
-        video.currentTime = progress.position;
-        showNotification(`Reprise à ${Math.floor(progress.position / 60)}min ${Math.floor(progress.position % 60)}s`, 'info');
+        video.addEventListener('loadedmetadata', () => {
+          video.currentTime = progress.position;
+          showNotification(`Reprise à ${Math.floor(progress.position / 60)}min ${Math.floor(progress.position % 60)}s`, 'info');
+        }, { once: true });
       }
       
-      video.play();
+      // Démarrer la lecture
+      video.play().catch(e => {
+        console.error('Erreur lecture:', e);
+        showNotification('Cliquez sur ▶️ pour lancer la lecture', 'info');
+      });
       
       // Retourner à l'onglet Live pour voir le lecteur
       switchTab('live');
       
-      showNotification('Lecture de l\'enregistrement...', 'info');
+      showNotification('Chargement de la rediffusion...', 'info');
     }
     
     // Supprimer un enregistrement
