@@ -239,6 +239,23 @@ async def api_start(body: StartBody):
 
     person = slugify(person)
     print(f"🔖 Person slugifié: {person}")
+    
+    # Vérifier si une qualité spécifique est configurée pour ce modèle
+    record_quality = 'best'  # Par défaut
+    try:
+        models = load_models()
+        model_config = next((m for m in models if m.get('username') == person), None)
+        if model_config:
+            record_quality = model_config.get('recordQuality', 'best')
+            print(f"🎛️ Qualité configurée pour {person}: {record_quality}")
+    except Exception as e:
+        print(f"⚠️ Impossible de charger config modèle: {e}")
+    
+    # Sélectionner l'URL de la qualité appropriée
+    if record_quality != 'best':
+        print(f"🔄 Sélection de la qualité {record_quality}...")
+        m3u8_url = select_quality_url(m3u8_url, record_quality)
+    
     print(f"\n🚀 Démarrage de la session FFmpeg...")
 
     try:
@@ -677,6 +694,93 @@ async def delete_recording(username: str, filename: str):
 
 
 # ============================================
+# Sélection de qualité HLS
+# ============================================
+
+def select_quality_url(master_url: str, quality: str) -> str:
+    """
+    Sélectionne l'URL de la qualité appropriée depuis un master playlist HLS.
+    
+    Args:
+        master_url: URL du master playlist (playlist.m3u8)
+        quality: Qualité demandée ('best', '1080p', '720p', '480p', '360p', '240p')
+    
+    Returns:
+        URL de la qualité sélectionnée
+    """
+    # Si qualité = 'best', retourner l'URL master (adaptative)
+    if quality == 'best':
+        return master_url
+    
+    # Mapping qualité -> bitrate approximatif (en kbps)
+    quality_bitrates = {
+        '1080p': 5128,  # ~5 Mbps
+        '720p': 3096,   # ~3 Mbps
+        '480p': 1148,   # ~1.1 Mbps
+        '360p': 648,    # ~650 kbps
+        '240p': 448     # ~450 kbps
+    }
+    
+    target_bitrate = quality_bitrates.get(quality)
+    if not target_bitrate:
+        print(f"⚠️ Qualité inconnue '{quality}', utilisation de 'best'")
+        return master_url
+    
+    try:
+        # Télécharger le master playlist
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+        response = requests.get(master_url, headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            print(f"⚠️ Impossible de charger master playlist, utilisation URL par défaut")
+            return master_url
+        
+        playlist_content = response.text
+        base_url = master_url.rsplit('/', 1)[0] + '/'
+        
+        # Parser le playlist M3U8 pour trouver les variantes
+        variants = []
+        lines = playlist_content.split('\n')
+        
+        for i, line in enumerate(lines):
+            if line.startswith('#EXT-X-STREAM-INF:'):
+                # Extraire le bitrate
+                bandwidth_match = re.search(r'BANDWIDTH=(\d+)', line)
+                if bandwidth_match and i + 1 < len(lines):
+                    bandwidth = int(bandwidth_match.group(1))
+                    bitrate_kbps = bandwidth // 1000
+                    variant_url = lines[i + 1].strip()
+                    
+                    # Construire l'URL complète si relative
+                    if not variant_url.startswith('http'):
+                        variant_url = base_url + variant_url
+                    
+                    variants.append({
+                        'bitrate': bitrate_kbps,
+                        'url': variant_url
+                    })
+        
+        if not variants:
+            print(f"⚠️ Aucune variante trouvée, utilisation URL par défaut")
+            return master_url
+        
+        # Trier par bitrate
+        variants.sort(key=lambda x: x['bitrate'])
+        
+        # Trouver la variante la plus proche du bitrate cible
+        selected = min(variants, key=lambda x: abs(x['bitrate'] - target_bitrate))
+        
+        print(f"🎯 Qualité sélectionnée: {selected['bitrate']}kbps (demandé: {quality})")
+        return selected['url']
+        
+    except Exception as e:
+        print(f"⚠️ Erreur sélection qualité: {e}, utilisation URL par défaut")
+        return master_url
+
+
+# ============================================
 # Background Task - Auto-enregistrement
 # ============================================
 
@@ -697,6 +801,7 @@ async def auto_record_task():
             for model in models:
                 username = model.get('username')
                 auto_record = model.get('autoRecord', True)  # Par défaut activé
+                record_quality = model.get('recordQuality', 'best')  # Qualité configurée
                 
                 if not username:
                     continue
@@ -730,11 +835,14 @@ async def auto_record_task():
                         
                         if hls_source:
                             # Modèle en ligne avec flux HLS disponible
-                            print(f"🔴 Auto-démarrage enregistrement: {username}")
+                            print(f"🔴 Auto-démarrage enregistrement: {username} (qualité: {record_quality})")
+                            
+                            # Sélectionner l'URL de la qualité configurée
+                            selected_url = select_quality_url(hls_source, record_quality)
                             
                             # Lancer l'enregistrement
                             session_id = manager.start(
-                                stream_url=hls_source,
+                                stream_url=selected_url,
                                 display_name=username,
                                 person=username
                             )
