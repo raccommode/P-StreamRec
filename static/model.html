@@ -478,13 +478,25 @@
       opacity: 0.5;
     }
   </style>
+  <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script>
+    // Charger la version
+    fetch('/api/version')
+      .then(r => r.json())
+      .then(data => {
+        const versionEl = document.getElementById('appVersion');
+        if (versionEl) versionEl.textContent = `v${data.version}`;
+      })
+      .catch(() => {});
+  </script>
 </head>
 <body>
   <header class="header">
     <button class="back-btn" onclick="window.location.href='/'">←</button>
     <div class="model-header">
       <div class="model-title" id="modelName">Chargement...</div>
+      <span class="version" id="appVersion" style="margin-left: 1rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(99, 102, 241, 0.1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2);">v1.0.0</span>
       <div class="model-subtitle">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Vérification...</span>
@@ -495,13 +507,17 @@
     </button>
     <button class="action-btn btn-delete" onclick="deleteModel()">
     </button>
+    <div class="lang-selector" style="display: flex; gap: 0.5rem; margin-left: 1rem;">
+      <button class="lang-btn" data-lang="fr" style="background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">🇫🇷 FR</button>
+      <button class="lang-btn" data-lang="en" style="background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">🇬🇧 EN</button>
+    </div>
   </header>
 
   <div class="container">
     <!-- Onglets -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('live')">📺 Live</button>
-      <button class="tab-btn" onclick="switchTab('recordings')">📁 Rediffusions</button>
+      <button class="tab-btn active" onclick="switchTab('live')" data-i18n="live">📺 Live</button>
+      <button class="tab-btn" onclick="switchTab('recordings')" data-i18n="replays">📁 Rediffusions</button>
     </div>
 
     <!-- Contenu Live -->
