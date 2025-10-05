@@ -41,6 +41,8 @@ function extractUsername(url) {
 function openAddModal() {
   document.getElementById('addModal').classList.add('active');
   document.getElementById('modelUrl').value = '';
+  document.getElementById('recordQuality').value = 'best';
+  document.getElementById('retentionDays').value = '30';
   document.getElementById('modelUrl').focus();
 }
 

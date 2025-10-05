@@ -19,6 +19,15 @@ const translations = {
     addNewModel: "Ajouter un nouveau modèle",
     enterUrl: "Entrez l'URL du modèle ou son username",
     urlPlaceholder: "https://chaturbate.com/username ou username",
+    recordQuality: "Qualité d'enregistrement",
+    qualityBest: "🎯 Meilleure qualité (défaut)",
+    quality1080p: "1080p (Full HD)",
+    quality720p: "720p (HD)",
+    quality480p: "480p (SD)",
+    quality360p: "360p (Faible)",
+    qualityDesc: "Qualité du flux enregistré (plus élevé = plus d'espace disque)",
+    retentionDays: "Durée de conservation (jours)",
+    retentionDesc: "Les rediffusions plus anciennes seront automatiquement supprimées (défaut: 30 jours)",
     cancel: "Annuler",
     add: "Ajouter",
     
@@ -90,6 +99,15 @@ const translations = {
     addNewModel: "Add New Model",
     enterUrl: "Enter model URL or username",
     urlPlaceholder: "https://chaturbate.com/username or username",
+    recordQuality: "Recording Quality",
+    qualityBest: "🎯 Best Quality (default)",
+    quality1080p: "1080p (Full HD)",
+    quality720p: "720p (HD)",
+    quality480p: "480p (SD)",
+    quality360p: "360p (Low)",
+    qualityDesc: "Quality of recorded stream (higher = more disk space)",
+    retentionDays: "Retention Duration (days)",
+    retentionDesc: "Older replays will be automatically deleted (default: 30 days)",
     cancel: "Cancel",
     add: "Add",
     
@@ -190,6 +208,18 @@ function translatePage() {
     
     if (el.tagName === 'INPUT' && el.placeholder !== undefined) {
       el.placeholder = translation;
+    } else if (el.tagName === 'OPTION') {
+      // Pour les options de select, garder l'emoji/préfixe et remplacer le texte
+      const currentText = el.textContent;
+      const emojiMatch = currentText.match(/^(🎯|[0-9]+p)/);
+      if (emojiMatch) {
+        // Garder le préfixe
+        const prefix = emojiMatch[0];
+        const translatedText = translation.replace(prefix, '').trim();
+        el.textContent = `${prefix} ${translatedText}`;
+      } else {
+        el.textContent = translation;
+      }
     } else {
       el.textContent = translation;
     }
