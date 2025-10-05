@@ -78,7 +78,8 @@ async function addModel(event) {
         username: username,
         addedAt: new Date().toISOString(),
         recordQuality: quality,
-        retentionDays: retentionDays
+        retentionDays: retentionDays,
+        autoRecord: true  // Par défaut activé
       })
     });
     

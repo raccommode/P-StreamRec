@@ -481,14 +481,19 @@
   <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script>
-    // Charger la version
-    fetch('/api/version')
-      .then(r => r.json())
-      .then(data => {
+    // Charger la version depuis l'API (synchronisée avec version.json)
+    (async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
         const versionEl = document.getElementById('appVersion');
         if (versionEl) versionEl.textContent = `v${data.version}`;
-      })
-      .catch(() => {});
+      } catch (e) {
+        console.error('Erreur chargement version:', e);
+        const versionEl = document.getElementById('appVersion');
+        if (versionEl) versionEl.textContent = 'v?.?.?';
+      }
+    })();
   </script>
 </head>
 <body>
@@ -496,19 +501,14 @@
     <button class="back-btn" onclick="window.location.href='/'">←</button>
     <div class="model-header">
       <div class="model-title" id="modelName">Chargement...</div>
-      <span class="version" id="appVersion" style="margin-left: 1rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(99, 102, 241, 0.1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2);">v1.0.0</span>
+      <span class="version" id="appVersion" style="margin-left: 1rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(99, 102, 241, 0.1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2);">...</span>
       <div class="model-subtitle">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Vérification...</span>
       </div>
     </div>
-    <button class="action-btn btn-record" id="recordBtn" onclick="toggleRecording()">
-      ⏺ Démarrer l'enregistrement
-    </button>
     <button class="action-btn" onclick="openSettingsModal()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.3);" title="Paramètres">
-      ⚙️
-    </button>
-    <button class="action-btn btn-delete" onclick="deleteModel()">
+      ⚙️ Paramètres
     </button>
     <div class="lang-selector" style="display: flex; gap: 0.5rem; margin-left: 1rem;">
       <button class="lang-btn" data-lang="fr" style="background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">🇫🇷 FR</button>
@@ -588,15 +588,40 @@
           </small>
         </div>
         
-        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: var(--text-primary); font-weight: 500;">
+            <input 
+              type="checkbox" 
+              id="settingsAutoRecord"
+              style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent);"
+            />
+            <span>🤖 Enregistrement automatique</span>
+          </label>
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem; display: block; margin-left: 2rem;">
+            Le serveur enregistre automatiquement quand le modèle est en ligne (vérifié toutes les 2 minutes)
+          </small>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
           <button type="button" onclick="closeSettingsModal()" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 1rem;">
             Annuler
           </button>
           <button type="submit" style="padding: 0.75rem 1.5rem; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-size: 1rem; font-weight: 500;">
-            Enregistrer
+            💾 Enregistrer
           </button>
         </div>
       </form>
+      
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);" />
+      
+      <div style="text-align: center;">
+        <button type="button" onclick="deleteModelFromSettings()" style="padding: 0.75rem 1.5rem; border: 1px solid var(--danger); border-radius: 8px; background: transparent; color: var(--danger); cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s;">
+          🗑️ Supprimer ce modèle
+        </button>
+        <div style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+          Cette action est irréversible
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1105,10 +1130,12 @@
           if (model) {
             document.getElementById('settingsQuality').value = model.recordQuality || 'best';
             document.getElementById('settingsRetention').value = model.retentionDays || 30;
+            document.getElementById('settingsAutoRecord').checked = model.autoRecord !== false; // Par défaut true
           } else {
             // Valeurs par défaut si le modèle n'existe pas
             document.getElementById('settingsQuality').value = 'best';
             document.getElementById('settingsRetention').value = 30;
+            document.getElementById('settingsAutoRecord').checked = true;
           }
         }
       } catch (e) {
@@ -1128,6 +1155,7 @@
       
       const quality = document.getElementById('settingsQuality').value;
       const retention = parseInt(document.getElementById('settingsRetention').value);
+      const autoRecord = document.getElementById('settingsAutoRecord').checked;
       
       try {
         const res = await fetch(`/api/models/${username}`, {
@@ -1137,7 +1165,8 @@
           },
           body: JSON.stringify({
             recordQuality: quality,
-            retentionDays: retention
+            retentionDays: retention,
+            autoRecord: autoRecord
           })
         });
         
@@ -1149,6 +1178,29 @@
         }
       } catch (e) {
         console.error('Erreur sauvegarde paramètres:', e);
+        showNotification('Erreur de connexion', 'error');
+      }
+    }
+    
+    // Supprimer le modèle depuis les paramètres
+    async function deleteModelFromSettings() {
+      if (!confirm(`Voulez-vous vraiment supprimer ${username} de votre liste ?\n\nCette action est irréversible.`)) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/models/${username}`, {
+          method: 'DELETE'
+        });
+        
+        if (res.ok) {
+          showNotification('Modèle supprimé');
+          setTimeout(() => window.location.href = '/', 1000);
+        } else {
+          showNotification('Erreur lors de la suppression', 'error');
+        }
+      } catch (e) {
+        console.error('Erreur suppression modèle:', e);
         showNotification('Erreur de connexion', 'error');
       }
     }

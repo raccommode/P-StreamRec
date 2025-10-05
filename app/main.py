@@ -612,6 +612,8 @@ async def update_model(username: str, model_data: dict):
         models[model_index]['recordQuality'] = model_data['recordQuality']
     if 'retentionDays' in model_data:
         models[model_index]['retentionDays'] = model_data['retentionDays']
+    if 'autoRecord' in model_data:
+        models[model_index]['autoRecord'] = model_data['autoRecord']
     
     if save_models_to_file(models):
         return {"success": True, "model": models[model_index]}
@@ -694,8 +696,14 @@ async def auto_record_task():
             
             for model in models:
                 username = model.get('username')
+                auto_record = model.get('autoRecord', True)  # Par défaut activé
+                
                 if not username:
                     continue
+                
+                # Vérifier si l'enregistrement auto est activé
+                if not auto_record:
+                    continue  # Auto-enregistrement désactivé pour ce modèle
                 
                 # Vérifier si déjà en enregistrement
                 is_recording = any(
