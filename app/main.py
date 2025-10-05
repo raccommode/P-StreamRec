@@ -25,90 +25,6 @@ HLS_TIME = int(os.getenv("HLS_TIME", "4"))
 HLS_LIST_SIZE = int(os.getenv("HLS_LIST_SIZE", "6"))
 CB_RESOLVER_ENABLED = os.getenv("CB_RESOLVER_ENABLED", "false").lower() in {"1", "true", "yes"}
 
-
-# ============================================
-# Chaturbate HLS Quality Selector
-# ============================================
-
-def get_best_hls_url(api_data: dict, preferred_quality: str = "best", debug: bool = False) -> Optional[str]:
-    """
-    Extrait la meilleure URL HLS depuis la réponse API Chaturbate
-    
-    L'API Chaturbate retourne plusieurs champs possibles:
-    - hls_source: URL HLS par défaut (souvent pas la meilleure qualité)
-    - stream_server: Serveur de streaming
-    - various resolution URLs
-    
-    Cette fonction cherche la meilleure qualité disponible
-    """
-    
-    # Si pas de données
-    if not api_data:
-        return None
-    
-    # Debug: afficher toutes les clés disponibles
-    if debug:
-        print(f"\n{'='*60}")
-        print(f"📊 API Response Keys:")
-        for key, value in api_data.items():
-            if isinstance(value, str) and len(value) < 200:
-                print(f"  {key}: {value}")
-            elif isinstance(value, (int, bool)):
-                print(f"  {key}: {value}")
-            else:
-                print(f"  {key}: {type(value).__name__}")
-        print(f"{'='*60}\n")
-    
-    # 1. Vérifier hls_source (URL complète)
-    hls_source = api_data.get('hls_source')
-    
-    # 2. Si hls_source existe et contient déjà une URL complète
-    if hls_source and isinstance(hls_source, str) and hls_source.startswith('http'):
-        # Analyser l'URL pour voir si on peut obtenir une meilleure qualité
-        # Certaines URLs ont le pattern: .../playlist.m3u8 ou .../master.m3u8
-        
-        # Si c'est un master.m3u8, c'est déjà la meilleure qualité disponible
-        if 'master.m3u8' in hls_source or '_fast' in hls_source:
-            print(f"✅ Using master playlist (best quality)")
-            return hls_source
-        
-        # Essayer de remplacer par master.m3u8 pour avoir le manifeste complet
-        if 'playlist.m3u8' in hls_source:
-            # Remplacer playlist.m3u8 par master.m3u8
-            master_url = hls_source.replace('playlist.m3u8', 'master.m3u8')
-            print(f"⬆️ Upgrading playlist.m3u8 → master.m3u8")
-            return master_url
-        
-        # Essayer de remplacer par _fast pour obtenir la meilleure qualité
-        # Pattern: https://.../.m3u8 → https://.../index_fast.m3u8
-        if '.m3u8' in hls_source and 'index' not in hls_source:
-            # Chercher le pattern avant .m3u8
-            base_url = hls_source.replace('.m3u8', '')
-            fast_url = f"{base_url}_fast.m3u8"
-            print(f"⬆️ Trying _fast quality: {fast_url}")
-            return fast_url
-        
-        return hls_source
-    
-    # 3. Construire l'URL depuis stream_server et autres champs
-    stream_server = api_data.get('stream_server')
-    if stream_server:
-        # Pattern typique: https://edge-hls.doppiocdn.com/hls/...
-        # On cherche à construire l'URL master.m3u8
-        
-        # Essayer de trouver des URLs de streaming
-        for key in api_data.keys():
-            if 'stream' in key.lower() or 'hls' in key.lower() or 'manifest' in key.lower():
-                value = api_data.get(key)
-                if isinstance(value, str) and ('m3u8' in value or 'hls' in value):
-                    print(f"📺 Found HLS URL in key '{key}': {value[:80]}...")
-                    return value
-    
-    # 4. Fallback: retourner hls_source même s'il n'est pas HTTP
-    if hls_source:
-        print(f"⚠️ Using fallback hls_source (may not be best quality)")
-    return hls_source
-
 # Ensure dirs
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -585,45 +501,6 @@ async def get_model_status(username: str):
         }
 
 
-@app.get("/api/model/{username}/hls-debug")
-async def get_model_hls_debug(username: str):
-    """Debug: Affiche toutes les données HLS de l'API Chaturbate"""
-    if not CB_RESOLVER_ENABLED:
-        raise HTTPException(status_code=400, detail="Résolution Chaturbate désactivée")
-    
-    try:
-        import requests
-        url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-            "Referer": "https://chaturbate.com/",
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Tester la fonction de sélection de qualité
-            best_url = get_best_hls_url(data, "best", debug=True)
-            
-            return {
-                "username": username,
-                "detected_best_url": best_url,
-                "hls_source": data.get("hls_source"),
-                "stream_server": data.get("stream_server"),
-                "room_status": data.get("room_status"),
-                "all_keys": list(data.keys()),
-                "raw_api_response": data
-            }
-        else:
-            raise HTTPException(status_code=response.status_code, detail="API Chaturbate unavailable")
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/api/thumbnail/{username}")
 async def get_thumbnail(username: str):
     """Génère miniature depuis le flux HLS si disponible, sinon fallback Chaturbate"""
@@ -1023,22 +900,15 @@ async def auto_record_task():
                     resp = requests.get(api_url, headers=headers, timeout=10)
                     if resp.status_code == 200:
                         data = resp.json()
+                        hls_source = data.get('hls_source')
                         
-                        # Obtenir la meilleure qualité HLS disponible
-                        quality_preference = model.get('recordQuality', 'best')
-                        # Activer debug pour le premier enregistrement uniquement
-                        debug_enabled = os.getenv("DEBUG_HLS", "false").lower() in {"1", "true", "yes"}
-                        hls_url = get_best_hls_url(data, quality_preference, debug=debug_enabled)
-                        
-                        if hls_url:
+                        if hls_source:
                             # Modèle en ligne avec flux HLS disponible
                             print(f"🔴 Auto-démarrage enregistrement: {username}")
-                            print(f"📺 Quality preference: {quality_preference}")
-                            print(f"📺 HLS URL: {hls_url[:100]}...")
                             
                             # Lancer l'enregistrement
                             session_id = manager.start(
-                                stream_url=hls_url,
+                                stream_url=hls_source,
                                 display_name=username,
                                 person=username
                             )
