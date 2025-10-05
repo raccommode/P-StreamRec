@@ -505,6 +505,9 @@
     <button class="action-btn btn-record" id="recordBtn" onclick="toggleRecording()">
       ⏺ Démarrer l'enregistrement
     </button>
+    <button class="action-btn" onclick="openSettingsModal()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.3);" title="Paramètres">
+      ⚙️
+    </button>
     <button class="action-btn btn-delete" onclick="deleteModel()">
     </button>
     <div class="lang-selector" style="display: flex; gap: 0.5rem; margin-left: 1rem;">
@@ -548,6 +551,52 @@
           <!-- Les enregistrements seront ajoutés ici -->
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Paramètres -->
+  <div class="modal" id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--bg-card); padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
+      <h2 style="margin-bottom: 1.5rem; color: var(--text-primary);">⚙️ Paramètres du modèle</h2>
+      <form onsubmit="saveSettings(event)">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="settingsQuality" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Qualité d'enregistrement</label>
+          <select id="settingsQuality" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1rem;">
+            <option value="best">🎯 Meilleure qualité (défaut)</option>
+            <option value="1080p">1080p (Full HD)</option>
+            <option value="720p">720p (HD)</option>
+            <option value="480p">480p (SD)</option>
+            <option value="360p">360p (Faible)</option>
+          </select>
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Qualité du flux enregistré (plus élevé = plus d'espace disque)
+          </small>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="settingsRetention" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Durée de conservation (jours)</label>
+          <input 
+            type="number" 
+            id="settingsRetention"
+            min="1"
+            max="365"
+            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1rem;"
+            required
+          />
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Les rediffusions plus anciennes seront automatiquement supprimées (défaut: 30 jours)
+          </small>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <button type="button" onclick="closeSettingsModal()" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 1rem;">
+            Annuler
+          </button>
+          <button type="submit" style="padding: 0.75rem 1.5rem; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-size: 1rem; font-weight: 500;">
+            Enregistrer
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1041,6 +1090,66 @@
       } catch (e) {
         console.error('Erreur suppression:', e);
         showNotification('Erreur lors de la suppression', 'error');
+      }
+    }
+
+    // Paramètres du modèle
+    async function openSettingsModal() {
+      // Charger les paramètres actuels du modèle
+      try {
+        const res = await fetch('/api/models');
+        if (res.ok) {
+          const data = await res.json();
+          const model = data.models.find(m => m.username === username);
+          
+          if (model) {
+            document.getElementById('settingsQuality').value = model.recordQuality || 'best';
+            document.getElementById('settingsRetention').value = model.retentionDays || 30;
+          } else {
+            // Valeurs par défaut si le modèle n'existe pas
+            document.getElementById('settingsQuality').value = 'best';
+            document.getElementById('settingsRetention').value = 30;
+          }
+        }
+      } catch (e) {
+        console.error('Erreur chargement paramètres:', e);
+      }
+      
+      // Afficher le modal
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+    
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+    
+    async function saveSettings(event) {
+      event.preventDefault();
+      
+      const quality = document.getElementById('settingsQuality').value;
+      const retention = parseInt(document.getElementById('settingsRetention').value);
+      
+      try {
+        const res = await fetch(`/api/models/${username}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            recordQuality: quality,
+            retentionDays: retention
+          })
+        });
+        
+        if (res.ok) {
+          showNotification('Paramètres sauvegardés', 'success');
+          closeSettingsModal();
+        } else {
+          showNotification('Erreur lors de la sauvegarde', 'error');
+        }
+      } catch (e) {
+        console.error('Erreur sauvegarde paramètres:', e);
+        showNotification('Erreur de connexion', 'error');
       }
     }
 

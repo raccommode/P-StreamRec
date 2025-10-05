@@ -592,6 +592,33 @@ async def add_model(model: dict):
         raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
 
 
+@app.put("/api/models/{username}")
+async def update_model(username: str, model_data: dict):
+    """Met à jour les paramètres d'un modèle"""
+    models = load_models()
+    
+    # Trouver le modèle
+    model_index = -1
+    for i, m in enumerate(models):
+        if m.get('username') == username:
+            model_index = i
+            break
+    
+    if model_index == -1:
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+    
+    # Mettre à jour les paramètres (garder username et addedAt)
+    if 'recordQuality' in model_data:
+        models[model_index]['recordQuality'] = model_data['recordQuality']
+    if 'retentionDays' in model_data:
+        models[model_index]['retentionDays'] = model_data['retentionDays']
+    
+    if save_models_to_file(models):
+        return {"success": True, "model": models[model_index]}
+    else:
+        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
+
+
 @app.delete("/api/models/{username}")
 async def delete_model(username: str):
     """Supprime un modèle de la liste"""
