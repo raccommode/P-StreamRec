@@ -150,6 +150,19 @@ async def favicon():
     return Response(content=svg_favicon, media_type="image/svg+xml")
 
 
+@app.get("/api/version")
+async def get_version():
+    """Retourne les informations de version"""
+    version_file = BASE_DIR / "version.json"
+    if version_file.exists():
+        try:
+            with open(version_file, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {"version": "1.0.0", "releaseDate": "2025-10-05"}
+
+
 @app.get("/model.html")
 async def model_page():
     return FileResponse(str(STATIC_DIR / "model.html"))

@@ -47,6 +47,13 @@
       align-items: center;
     }
     
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex: 0 0 auto;
+    }
+    
     .logo {
       font-size: 1.5rem;
       font-weight: 700;
@@ -56,11 +63,55 @@
       -webkit-text-fill-color: transparent;
       cursor: pointer;
       transition: transform 0.2s;
-      flex: 0 0 auto;
     }
     
     .logo:hover {
       transform: scale(1.05);
+    }
+    
+    .version {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: rgba(99, 102, 241, 0.1);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .lang-selector {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    
+    .lang-btn {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .lang-btn:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+    
+    .lang-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
     }
     
     .add-btn {
@@ -364,13 +415,34 @@
       color: var(--text-primary);
     }
   </style>
+  <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script defer src="/static/app.js"></script>
+  <script>
+    // Charger la version
+    fetch('/api/version')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('appVersion').textContent = `v${data.version}`;
+      })
+      .catch(() => {
+        document.getElementById('appVersion').textContent = 'v1.0.0';
+      });
+  </script>
 </head>
 <body>
   <header class="header">
-    <div class="logo" onclick="window.location.reload()">🎬 P-StreamRec</div>
-    <button class="add-btn" onclick="openAddModal()" title="Ajouter un modèle">+</button>
+    <div class="header-left">
+      <div class="logo" onclick="window.location.reload()">🎬 P-StreamRec</div>
+      <span class="version" id="appVersion">v1.0.0</span>
+    </div>
+    <div class="header-right">
+      <div class="lang-selector">
+        <button class="lang-btn" data-lang="fr">🇫🇷 FR</button>
+        <button class="lang-btn" data-lang="en">🇬🇧 EN</button>
+      </div>
+      <button class="add-btn" onclick="openAddModal()" data-i18n-title="addModel">+</button>
+    </div>
   </header>
 
   <div class="container">
@@ -380,28 +452,29 @@
     
     <div class="empty-state" id="emptyState">
       <div class="empty-state-icon">🎬</div>
-      <h3>Aucun modèle ajouté</h3>
-      <p>Cliquez sur le bouton + pour ajouter un modèle Chaturbate</p>
+      <h3 data-i18n="noModels">Aucun modèle ajouté</h3>
+      <p data-i18n="noModelsDesc">Cliquez sur le bouton + pour ajouter un modèle Chaturbate</p>
     </div>
   </div>
 
   <!-- Modal pour ajouter un modèle -->
   <div class="modal" id="addModal">
     <div class="modal-content">
-      <h2 class="modal-header">Ajouter un modèle Chaturbate</h2>
+      <h2 class="modal-header" data-i18n="addNewModel">Ajouter un modèle Chaturbate</h2>
       <form onsubmit="addModel(event)">
         <div class="form-group">
-          <label for="modelUrl">URL Chaturbate</label>
+          <label for="modelUrl" data-i18n="enterUrl">URL Chaturbate</label>
           <input 
             type="text" 
-            id="modelUrl" 
+            id="modelUrl"
+            data-i18n="urlPlaceholder" 
             placeholder="https://chaturbate.com/username/" 
             required
           />
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" onclick="closeAddModal()">Annuler</button>
-          <button type="submit" class="btn-primary">Ajouter</button>
+          <button type="button" class="btn-secondary" onclick="closeAddModal()" data-i18n="cancel">Annuler</button>
+          <button type="submit" class="btn-primary" data-i18n="add">Ajouter</button>
         </div>
       </form>
     </div>

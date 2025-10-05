@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2025-10-05",
+  "changelog": [
+    "Auto-enregistrement en arrière-plan",
+    "Sauvegarde serveur (navigation privée OK)",
+    "Cache métadonnées rediffusions",
+    "Sélecteur de qualité HLS",
+    "Protection enregistrement en cours"
+  ]
+}
