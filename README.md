@@ -1,113 +1,155 @@
 # P-StreamRec
 
-**Application complète pour l'enregistrement automatique de streams Chaturbate et m3u8**
+**Complete application for automatic recording of Chaturbate and m3u8 streams**
 
-Conteneur Docker tout-en-un pour regarder et enregistrer automatiquement des flux HLS/m3u8, avec une interface web moderne.
+All-in-one Docker container to watch and automatically record HLS/m3u8 streams, with a modern web interface.
 
-## Fonctionnalités principales
+## Main Features
 
-- **Enregistrement automatique** des streams Chaturbate par nom d'utilisateur
-- **Interface web moderne** pour contrôler les enregistrements
-- **Détection automatique** quand un utilisateur est en ligne
-- **Rotation journalière** des fichiers (1 fichier TS par jour)
-- **Support des URLs m3u8 directes** pour tout type de stream
-- **Docker ready** avec docker-compose pour Portainer/Umbrel
+- **Automatic recording** of Chaturbate streams by username
+- **Modern web interface** to control recordings
+- **Automatic detection** when a user goes online
+- **Daily rotation** of files (1 TS file per day)
+- **Direct m3u8 URL support** for any type of stream
+- **Docker ready** with docker-compose for Portainer/Umbrel
+- **Background auto-recording** (no need to keep page open)
+- **Server-side storage** (works in private browsing)
+- **Multilingual** (French/English)
 
-## Structure des données
+## Data Structure
 
-- **Enregistrements:** `/data/records/<person>/YYYY-MM-DD.ts`
+- **Recordings:** `/data/records/<person>/YYYY-MM-DD.ts`
 - **HLS streaming:** `/data/sessions/<session_id>/`
-- **Format:** MPEG-TS compatible avec tous les lecteurs (VLC, MPV, etc.)
+- **Format:** MPEG-TS compatible with all players (VLC, MPV, etc.)
+- **Models list:** `/data/models.json` (server-side storage)
 
-## Configuration (Variables d'environnement)
+## Configuration (Environment Variables)
 
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `OUTPUT_DIR` | `/data` | Dossier des enregistrements (volume Docker) |
-| `PORT` | `8080` | Port de l'interface web |
-| `FFMPEG_PATH` | `ffmpeg` | Chemin vers ffmpeg |
-| `HLS_TIME` | `4` | Durée des segments HLS (secondes) |
-| `HLS_LIST_SIZE` | `6` | Nombre de segments dans la playlist |
-| `CB_RESOLVER_ENABLED` | `true` | **Activer le support Chaturbate** |
-| `CB_COOKIE` | - | Cookie de session Chaturbate (optionnel) |
-| `AUTO_RECORD_USERS` | - | Liste d'utilisateurs à enregistrer automatiquement (séparés par virgule) |
-| `TZ` | `UTC` | Fuseau horaire (ex: `Europe/Paris`) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OUTPUT_DIR` | `/data` | Recordings folder (Docker volume) |
+| `PORT` | `8080` | Web interface port |
+| `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg |
+| `HLS_TIME` | `4` | HLS segment duration (seconds) |
+| `HLS_LIST_SIZE` | `6` | Number of segments in playlist |
+| `CB_RESOLVER_ENABLED` | `true` | **Enable Chaturbate support** |
+| `CB_COOKIE` | - | Chaturbate session cookie (optional) |
+| `AUTO_RECORD_USERS` | - | Comma-separated list of users to auto-record |
+| `TZ` | `UTC` | Timezone (e.g., `America/New_York`) |
 
-## Démarrage rapide
+## Quick Start
 
 ### Option 1: Docker Run
 ```bash
-{{ ... }}
-Si erreur "failed to load the compose file":
-1. Vérifiez que `docker-compose.yml` est présent dans le repo
-2. Vérifiez que "Compose path" = `docker-compose.yml`
-3. Vérifiez que la branche = `main`
+docker run -d \
+  --name p-streamrec \
+  -p 8080:8080 \
+  -v ./data:/data \
+  -e CB_RESOLVER_ENABLED=true \
+  ghcr.io/raccommode/p-streamrec:latest
+```
 
-## Utilisation
-
-### Interface Web (http://localhost:8080)
-
-1. **Démarrer un enregistrement:**
-   - Entrez un nom d'utilisateur Chaturbate (ex: `username`)
-   - Ou collez une URL m3u8 directe
-   - Cliquez sur **Démarrer l'enregistrement**
-
-2. **Regarder en direct:**
-   - L'enregistrement actif apparait dans la liste
-   - Cliquez sur **Regarder** pour voir le stream en direct
-   - Le lecteur vidéo intégré supporte HLS nativement
-
-3. **Gérer les sessions:**
-   - **URL** : Copier le lien du stream
-   - **Stop** : Arrêter un enregistrement
-   - **Arrêter tout** : Stopper tous les enregistrements
-
-### Enregistrement automatique
-
-#### Méthode 1: Variable d'environnement
+### Option 2: Docker Compose (Portainer)
 ```yaml
-AUTO_RECORD_USERS=user1,user2,user3
+version: "3.8"
+services:
+  p-streamrec:
+    image: ghcr.io/raccommode/p-streamrec:latest
+    container_name: p-streamrec
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - CB_RESOLVER_ENABLED=true
+      - TZ=America/New_York
+    restart: unless-stopped
 ```
 
-#### Méthode 2: Fichier de configuration
-Créez `/data/auto_record_users.txt` avec un nom d'utilisateur par ligne:
-```
-user1
-user2
-user3
-```
+If error "failed to load the compose file":
+1. Verify that `docker-compose.yml` is present in the repo
+2. Check that "Compose path" = `docker-compose.yml`
+3. Check that branch = `main`
 
-Le système vérifie automatiquement toutes les 30 secondes si les utilisateurs sont en ligne et démarre l'enregistrement.
+## Usage
 
-## Développement local
+### Web Interface (http://localhost:8080)
+
+1. **Add a model:**
+   - Click the **+** button
+   - Enter a Chaturbate username (e.g., `username`)
+   - Or paste a direct m3u8 URL
+   - Click **Add**
+
+2. **Automatic recording:**
+   - Once a model is added, the system checks every 2 minutes
+   - When the model goes online, recording starts automatically
+   - No need to keep the page open!
+
+3. **Watch replays:**
+   - Click on a model card
+   - Go to the **Replays** tab
+   - Click on a recording to watch
+   - Progress is automatically saved
+
+4. **Manage models:**
+   - Click on a model card to view details
+   - Click the delete button to remove from list
+   - Models are saved server-side (works in private browsing)
+
+### Features
+
+#### Background Auto-Recording
+- The server checks every 2 minutes if your models are online
+- Automatically starts recording when they go online
+- Works 24/7 even if you close your browser
+- Logs available in Docker/Portainer
+
+#### Quality Selector
+- Automatically selects the highest quality available
+- Manual quality selection if multiple streams available
+- Options: Auto (best), 1080p, 720p, 480p, etc.
+
+#### Smart Caching
+- Replay metadata cached for fast loading
+- 30x faster on subsequent loads
+- Automatic cache invalidation when files change
+
+## Local Development
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-## Récupération des enregistrements
+## Accessing Recordings
 
-Les fichiers sont stockés dans `/data/records/<username>/YYYY-MM-DD.ts`
+Files are stored in `/data/records/<username>/YYYY-MM-DD.ts`
 
-**Pour lire les fichiers TS:**
-- **VLC:** Ouvrir directement le fichier
+**To play TS files:**
+- **VLC:** Open file directly
 - **MPV:** `mpv /path/to/file.ts`
-- **FFmpeg conversion en MP4:** 
+- **FFmpeg convert to MP4:** 
   ```bash
   ffmpeg -i input.ts -c copy output.mp4
   ```
 
-## Notes importantes
+## Important Notes
 
-- **Respect de la vie privée:** Utilisez uniquement pour du contenu public
-- **Stockage:** Les fichiers TS peuvent être volumineux (~2-4 GB/heure)
-- **Bande passante:** Chaque stream consomme environ 1-3 Mbps
-- **CPU:** Utilisation minimale (simple copie de flux)
+- **Privacy respect:** Use only for public content
+- **Storage:** TS files can be large (~2-4 GB/hour)
+- **Bandwidth:** Each stream uses approximately 1-3 Mbps
+- **CPU:** Minimal usage (simple stream copy)
 
-## Notes légales
+## Version
 
-- Utilisez ce logiciel dans le respect des lois et des CGU des services
-- Ne contourne aucune protection technique
-- Assurez-vous d'avoir le droit d'enregistrer le contenu
-- Respectez la vie privée et les droits d'auteur
+Current version: **v1.0.0**
+
+See `version.json` for changelog and release information.
+
+## Legal Notice
+
+- Use this software in compliance with laws and service ToS
+- Does not bypass any technical protection measures
+- Ensure you have the right to record the content
+- Respect privacy and copyright laws
