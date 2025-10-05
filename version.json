@@ -1,14 +1,14 @@
 {
-  "version": "2025.40.A",
+  "version": "2025.40.B",
   "releaseDate": "2025-10-05",
   "changelog": [
-    "Auto-enregistrement en arrière-plan",
-    "Sauvegarde serveur (navigation privée OK)",
-    "Cache métadonnées rediffusions",
-    "Sélecteur de qualité HLS",
-    "Protection enregistrement en cours",
+    "GitOps: Mises à jour one-click depuis l'interface",
+    "Auto-enregistrement configurable par modèle",
+    "Interface simplifiée avec paramètres centralisés",
     "Qualité d'enregistrement configurable",
     "Rétention automatique des rediffusions",
+    "Version automatiquement synchronisée",
+    "Cache métadonnées rediffusions (30x plus rapide)",
     "Système de version ANNÉE.SEMAINE.LETTRE"
   ]
 }

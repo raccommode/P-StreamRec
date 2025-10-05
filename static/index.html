@@ -418,12 +418,28 @@
   <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script defer src="/static/app.js"></script>
+  <script>
+    // Charger la version depuis l'API (synchronisée avec version.json)
+    (async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        document.getElementById('appVersion').textContent = `v${data.version}`;
+      } catch (e) {
+        console.error('Erreur chargement version:', e);
+        document.getElementById('appVersion').textContent = 'v?.?.?';
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="header">
     <div class="header-left">
       <div class="logo" onclick="window.location.reload()">🎬 P-StreamRec</div>
       <span class="version" id="appVersion">...</span>
+      <button id="gitStatusBtn" onclick="openGitModal()" style="display: none; margin-left: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">
+        <span id="gitStatusIcon">🔄</span> <span id="gitStatusText">GitOps</span>
+      </button>
     </div>
     <div class="header-right">
       <div class="lang-selector">
@@ -499,19 +515,135 @@
       </form>
     </div>
   </div>
-  
+
+  <!-- Modal GitOps -->
+  <div class="modal" id="gitModal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🔄</span> GitOps Updates
+      </h2>
+      
+      <div id="gitInfo" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <strong style="color: var(--text-secondary); font-size: 0.875rem;">Current Branch:</strong>
+            <div id="gitBranch" style="font-family: monospace; color: var(--text-primary);">-</div>
+          </div>
+          <div>
+            <strong style="color: var(--text-secondary); font-size: 0.875rem;">Current Commit:</strong>
+            <div id="gitCommit" style="font-family: monospace; color: var(--text-primary);">-</div>
+          </div>
+          <div>
+            <strong style="color: var(--text-secondary); font-size: 0.875rem;">Remote Commit:</strong>
+            <div id="gitRemoteCommit" style="font-family: monospace; color: var(--text-primary);">-</div>
+          </div>
+          <div id="gitUpdateInfo" style="display: none; padding: 1rem; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px;">
+            <strong style="color: rgb(34, 197, 94);">✅ <span id="gitUpdateCount">0</span> update(s) available</strong>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button type="button" onclick="closeGitModal()" class="btn-secondary">Close</button>
+        <button type="button" onclick="checkGitUpdates()" class="btn-secondary">
+          🔄 Check for Updates
+        </button>
+        <button type="button" id="gitUpdateBtn" onclick="applyGitUpdate()" class="btn-primary" style="display: none;">
+          ⬇️ Apply Update
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // Charger la version depuis l'API (synchronisée avec version.json)
-    document.addEventListener('DOMContentLoaded', async function() {
+    // GitOps - Vérifier les mises à jour au démarrage
+    (async function checkGitStatus() {
       try {
-        const res = await fetch('/api/version');
+        const res = await fetch('/api/git/status');
         const data = await res.json();
-        document.getElementById('appVersion').textContent = `v${data.version}`;
+        
+        if (data.isGitRepo) {
+          document.getElementById('gitStatusBtn').style.display = 'inline-block';
+          
+          if (data.hasUpdates) {
+            document.getElementById('gitStatusIcon').textContent = '🔔';
+            document.getElementById('gitStatusText').textContent = `${data.behindBy} update(s)`;
+            document.getElementById('gitStatusBtn').style.background = 'rgba(34, 197, 94, 0.2)';
+            document.getElementById('gitStatusBtn').style.borderColor = 'rgba(34, 197, 94, 0.4)';
+            document.getElementById('gitStatusBtn').style.color = 'rgb(34, 197, 94)';
+          }
+        }
       } catch (e) {
-        console.error('Erreur chargement version:', e);
-        document.getElementById('appVersion').textContent = 'v?.?.?';
+        console.log('GitOps status check failed:', e);
       }
-    });
+    })();
+    
+    function openGitModal() {
+      document.getElementById('gitModal').classList.add('active');
+      checkGitUpdates();
+    }
+    
+    function closeGitModal() {
+      document.getElementById('gitModal').classList.remove('active');
+    }
+    
+    async function checkGitUpdates() {
+      try {
+        const res = await fetch('/api/git/status');
+        const data = await res.json();
+        
+        if (!data.isGitRepo) {
+          document.getElementById('gitInfo').innerHTML = '<p style="color: var(--text-secondary);">Not a Git repository</p>';
+          return;
+        }
+        
+        document.getElementById('gitBranch').textContent = data.currentBranch || '-';
+        document.getElementById('gitCommit').textContent = data.currentCommit || '-';
+        document.getElementById('gitRemoteCommit').textContent = data.remoteCommit || '-';
+        
+        if (data.hasUpdates) {
+          document.getElementById('gitUpdateInfo').style.display = 'block';
+          document.getElementById('gitUpdateCount').textContent = data.behindBy;
+          document.getElementById('gitUpdateBtn').style.display = 'inline-block';
+        } else {
+          document.getElementById('gitUpdateInfo').style.display = 'none';
+          document.getElementById('gitUpdateBtn').style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Error checking Git updates:', e);
+        showNotification('Error checking updates', 'error');
+      }
+    }
+    
+    async function applyGitUpdate() {
+      if (!confirm('Apply Git update and restart the application?\n\nThis will take a few seconds.')) {
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/git/update', {
+          method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (data.success && data.updated) {
+          showNotification(`Update applied! ${data.oldCommit} → ${data.newCommit}`, 'success');
+          closeGitModal();
+          
+          // Attendre le redémarrage puis recharger la page
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        } else if (data.success && !data.updated) {
+          showNotification('Already up to date', 'info');
+        } else {
+          showNotification('Update failed', 'error');
+        }
+      } catch (e) {
+        console.error('Error applying update:', e);
+        showNotification('Error applying update', 'error');
+      }
+    }
   </script>
 </body>
 </html>

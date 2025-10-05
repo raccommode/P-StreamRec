@@ -480,6 +480,21 @@
   </style>
   <script src="/static/i18n.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script>
+    // Charger la version depuis l'API (synchronisée avec version.json)
+    (async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        const versionEl = document.getElementById('appVersion');
+        if (versionEl) versionEl.textContent = `v${data.version}`;
+      } catch (e) {
+        console.error('Erreur chargement version:', e);
+        const versionEl = document.getElementById('appVersion');
+        if (versionEl) versionEl.textContent = 'v?.?.?';
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="header">
@@ -645,6 +660,8 @@
           
           document.getElementById('statusDot').className = 'status-dot recording';
           document.getElementById('statusText').textContent = 'En enregistrement';
+          document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-stop';
           
           // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
           if (!wasRecording) {
@@ -657,10 +674,14 @@
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot online';
           document.getElementById('statusText').textContent = 'En ligne';
+          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-record';
         } else {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot offline';
           document.getElementById('statusText').textContent = 'Hors ligne';
+          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
+          document.getElementById('recordBtn').className = 'action-btn btn-record';
         }
       } catch (e) {
         console.error('Erreur statut:', e);
@@ -1304,20 +1325,6 @@
     
     // Rafraîchir toutes les 10 secondes (moins agressif)
     setInterval(updateModelStatus, 10000);
-    
-    // Charger la version depuis l'API
-    (async function loadVersion() {
-      try {
-        const res = await fetch('/api/version');
-        const data = await res.json();
-        const versionEl = document.getElementById('appVersion');
-        if (versionEl) versionEl.textContent = `v${data.version}`;
-      } catch (e) {
-        console.error('Erreur chargement version:', e);
-        const versionEl = document.getElementById('appVersion');
-        if (versionEl) versionEl.textContent = 'v?.?.?';
-      }
-    })();
   </script>
 </body>
 </html>

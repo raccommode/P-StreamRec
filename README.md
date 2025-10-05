@@ -15,6 +15,7 @@ All-in-one Docker container to watch and automatically record HLS/m3u8 streams, 
 - **Background auto-recording** (no need to keep page open)
 - **Server-side storage** (works in private browsing)
 - **Multilingual** (French/English)
+- **GitOps updates** (one-click update from GitHub)
 
 ## Data Structure
 
@@ -114,6 +115,24 @@ If error "failed to load the compose file":
 - Replay metadata cached for fast loading
 - 30x faster on subsequent loads
 - Automatic cache invalidation when files change
+
+#### GitOps Updates
+- **One-click updates** directly from the web interface
+- Check for new versions from GitHub
+- Apply updates without SSH or command line
+- Automatic application restart after update
+- Perfect for Portainer/Docker deployments
+
+**How to use:**
+1. Look for the **GitOps** button in the header (appears only if in a Git repository)
+2. Click to see current version and available updates
+3. If updates are available, click **Apply Update**
+4. Application pulls latest changes and restarts automatically
+
+**Requirements:**
+- Application must be deployed as a Git clone
+- Git must be available in the container
+- Repository must have remote configured (origin)
 
 ## Local Development
 ```bash
