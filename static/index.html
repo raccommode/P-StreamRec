@@ -149,9 +149,7 @@
     
     /* Models Grid */
     .models-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.5rem;
+      display: block;
       margin-top: 2rem;
     }
     
@@ -256,6 +254,11 @@
     
     .badge.live { background: rgba(239, 68, 68, 0.9); }
     .badge.recording { background: rgba(99, 102, 241, 0.9); }
+    .badge.recordings-count { 
+      background: rgba(99, 102, 241, 0.7);
+      right: auto;
+      left: 12px;
+    }
     
     /* Modal */
     .modal {

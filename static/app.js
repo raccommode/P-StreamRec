@@ -297,13 +297,13 @@ async function updateModelsStatus() {
         if (isLive) {
           // Live/Recording : Couleur + rafraîchir la miniature depuis le stream
           thumbnail.style.filter = 'none';
-          thumbnail.src = `/api/thumbnail/${model.username}?t=${Date.now()}`;
+          thumbnail.src = `/api/thumbnail/${modelInfo.username}?t=${Date.now()}`;
         } else {
           // Offline : Noir et blanc (garde la miniature de la dernière rediffusion en cache)
           thumbnail.style.filter = 'grayscale(100%) brightness(0.7)';
           // Ne pas changer l'URL pour garder la miniature générée en cache
           if (!thumbnail.src.includes('/api/thumbnail/')) {
-            thumbnail.src = `/api/thumbnail/${model.username}`;
+            thumbnail.src = `/api/thumbnail/${modelInfo.username}`;
           }
         }
       }
@@ -315,17 +315,17 @@ async function updateModelsStatus() {
           liveGrid.appendChild(card);
         }
       } else {
-        // Remettre dans la section principale si pas live
-        const mainGrid = document.getElementById('modelsGrid');
-        if (card.parentElement !== mainGrid) {
-          mainGrid.appendChild(card);
+        // Remettre dans la section All Models si pas live
+        const allGrid = document.getElementById('allGrid');
+        if (allGrid && card.parentElement !== allGrid) {
+          allGrid.appendChild(card);
         }
       }
     }
     
     // Afficher/masquer la section LIVE selon le nombre
     if (liveSection) {
-      liveSection.style.display = liveCount > 0 ? 'contents' : 'none';
+      liveSection.style.display = liveCount > 0 ? 'block' : 'none';
     }
   } catch (e) {
     console.error('Error updating status:', e);
@@ -357,17 +357,16 @@ async function renderModels() {
     // Section LIVE MODELS
     const liveSection = document.createElement('div');
     liveSection.id = 'liveSection';
-    liveSection.style.display = 'none';
-    liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    liveSection.style.cssText = 'grid-column: 1 / -1; display: none; margin-bottom: 2rem;';
+    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> En Direct</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(liveSection);
     
-    // Section OFFLINE MODELS
-    const offlineSection = document.createElement('div');
-    offlineSection.id = 'offlineSection';
-    offlineSection.style.gridColumn = '1 / -1';
-    offlineSection.style.display = 'contents';
-    offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
-    grid.appendChild(offlineSection);
+    // Section ALL MODELS
+    const allSection = document.createElement('div');
+    allSection.id = 'allSection';
+    allSection.style.cssText = 'grid-column: 1 / -1;';
+    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> Tous les Modèles</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    grid.appendChild(allSection);
     
     // Créer les cartes IMMÉDIATEMENT avec les données du cache
     for (const modelInfo of models) {
@@ -396,7 +395,13 @@ async function renderModels() {
         </div>
       `;
       
-      grid.appendChild(card);
+      // Ajouter dans la section All Models par défaut
+      const allGrid = document.getElementById('allGrid');
+      if (allGrid) {
+        allGrid.appendChild(card);
+      } else {
+        grid.appendChild(card);
+      }
     }
   }
   
@@ -417,16 +422,15 @@ async function renderModels() {
     
     const liveSection = document.createElement('div');
     liveSection.id = 'liveSection';
-    liveSection.style.display = 'none';
-    liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    liveSection.style.cssText = 'grid-column: 1 / -1; display: none; margin-bottom: 2rem;';
+    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> En Direct</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(liveSection);
     
-    const offlineSection = document.createElement('div');
-    offlineSection.id = 'offlineSection';
-    offlineSection.style.gridColumn = '1 / -1';
-    offlineSection.style.display = 'contents';
-    offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
-    grid.appendChild(offlineSection);
+    const allSection = document.createElement('div');
+    allSection.id = 'allSection';
+    allSection.style.cssText = 'grid-column: 1 / -1;';
+    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> Tous les Modèles</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    grid.appendChild(allSection);
     
     for (const modelInfo of freshModels) {
       const card = document.createElement('div');
@@ -454,7 +458,13 @@ async function renderModels() {
         </div>
       `;
       
-      grid.appendChild(card);
+      // Ajouter dans la section All Models
+      const allGrid = document.getElementById('allGrid');
+      if (allGrid) {
+        allGrid.appendChild(card);
+      } else {
+        grid.appendChild(card);
+      }
     }
   }
   
