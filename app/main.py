@@ -684,7 +684,13 @@ async def get_dashboard():
         if models_file.exists():
             with open(models_file) as f:
                 models_data = json.load(f)
-                models = models_data.get("models", [])
+                # Support des deux formats: {"models": [...]} ou [...]
+                if isinstance(models_data, dict):
+                    models = models_data.get("models", [])
+                elif isinstance(models_data, list):
+                    models = models_data
+                else:
+                    models = []
         else:
             models = []
         
