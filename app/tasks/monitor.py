@@ -184,7 +184,80 @@ async def download_thumbnail_from_chaturbate(
     
     return None
 
-async def update_recordings_cache(db: 'Database', username: str, output_dir: Path):
+async def get_video_duration(file_path: Path, ffmpeg_path: str = "ffmpeg") -> int:
+    """Récupère la durée d'une vidéo avec ffprobe"""
+    try:
+        # Utiliser ffprobe pour récupérer la durée
+        ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
+        
+        process = await asyncio.create_subprocess_exec(
+            ffprobe_path,
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(file_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10)
+        
+        if process.returncode == 0 and stdout:
+            duration_str = stdout.decode().strip()
+            if duration_str:
+                return int(float(duration_str))
+    
+    except Exception as e:
+        logger.debug("Erreur récupération durée vidéo", file_path=str(file_path), error=str(e))
+    
+    return 0
+
+
+async def generate_recording_thumbnail(
+    ts_file: Path,
+    output_dir: Path,
+    username: str,
+    ffmpeg_path: str = "ffmpeg"
+) -> str | None:
+    """Génère une miniature pour un enregistrement"""
+    try:
+        # Dossier pour les miniatures d'enregistrements
+        thumbs_dir = output_dir / "thumbnails" / username
+        thumbs_dir.mkdir(parents=True, exist_ok=True)
+        thumb_path = thumbs_dir / f"{ts_file.stem}.jpg"
+        
+        # Ne pas régénérer si existe déjà
+        if thumb_path.exists():
+            return str(thumb_path)
+        
+        # Extraire une frame à 30 secondes du début
+        process = await asyncio.create_subprocess_exec(
+            ffmpeg_path,
+            "-ss", "00:00:30",
+            "-i", str(ts_file),
+            "-vframes", "1",
+            "-vf", "scale=320:-1",
+            "-y",
+            str(thumb_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+        
+        await asyncio.wait_for(process.wait(), timeout=15)
+        
+        if thumb_path.exists():
+            return str(thumb_path)
+    
+    except Exception as e:
+        logger.debug("Erreur génération miniature enregistrement", 
+                    username=username, 
+                    filename=ts_file.name, 
+                    error=str(e))
+    
+    return None
+
+
+async def update_recordings_cache(db: 'Database', username: str, output_dir: Path, ffmpeg_path: str = "ffmpeg"):
     """Met à jour le cache des enregistrements dans SQLite"""
     try:
         records_dir = output_dir / "records" / username
@@ -195,12 +268,37 @@ async def update_recordings_cache(db: 'Database', username: str, output_dir: Pat
         for ts_file in records_dir.glob("*.ts"):
             stat = ts_file.stat()
             
+            # Récupérer la durée actuelle depuis la DB
+            existing_recordings = await db.get_recordings(username)
+            existing_rec = next((r for r in existing_recordings if r['filename'] == ts_file.name), None)
+            
+            # Calculer la durée uniquement si elle n'est pas déjà en cache ou est à 0
+            duration_seconds = 0
+            if existing_rec:
+                duration_seconds = existing_rec.get('duration_seconds', 0)
+            
+            if duration_seconds == 0:
+                # Calculer la durée avec ffprobe
+                duration_seconds = await get_video_duration(ts_file, ffmpeg_path)
+                logger.debug("Durée calculée", username=username, filename=ts_file.name, duration=duration_seconds)
+            
+            # Générer la miniature si elle n'existe pas
+            thumbnail_path = None
+            if existing_rec:
+                thumbnail_path = existing_rec.get('thumbnail_path')
+            
+            if not thumbnail_path or not Path(thumbnail_path).exists():
+                thumbnail_path = await generate_recording_thumbnail(ts_file, output_dir, username, ffmpeg_path)
+                if thumbnail_path:
+                    logger.debug("Miniature générée", username=username, filename=ts_file.name, thumb=thumbnail_path)
+            
             await db.add_or_update_recording(
                 username=username,
                 filename=ts_file.name,
                 file_path=str(ts_file),
                 file_size=stat.st_size,
-                duration_seconds=0  # Peut être calculé plus tard si nécessaire
+                duration_seconds=duration_seconds,
+                thumbnail_path=thumbnail_path
             )
     
     except Exception as e:
@@ -294,7 +392,7 @@ async def monitor_models_task(
                         )
                         
                         # Mettre à jour le cache des enregistrements
-                        await update_recordings_cache(db, username, OUTPUT_DIR)
+                        await update_recordings_cache(db, username, OUTPUT_DIR, ffmpeg_path)
                         
                         logger.debug("Modèle mis à jour",
                                    username=username,

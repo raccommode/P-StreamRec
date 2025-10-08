@@ -18,11 +18,12 @@ class FFmpegSession:
         self.name = display_name or person or session_id
         self.created_at = datetime.utcnow().isoformat() + "Z"
         self.start_time = time.time()
+        self.start_date = datetime.now().strftime("%Y-%m-%d")  # Date de début du stream
         self.process: Optional[subprocess.Popen] = None
         # Playback HLS is served from /streams/sessions/<id>/stream.m3u8
         self.playback_url = f"/streams/sessions/{self.id}/stream.m3u8"
-        # Recording template per day
-        self.record_template = os.path.join(self.records_dir_for_person, "%Y-%m-%d.ts")
+        # Recording file using start date (single file per stream)
+        self.record_path = os.path.join(self.records_dir_for_person, f"{self.start_date}.ts")
         self.log_path = os.path.join(self.sessions_dir, "ffmpeg.log")
         self._stop_evt = threading.Event()
         self._writer_thread: Optional[threading.Thread] = None
@@ -38,25 +39,24 @@ class FFmpegSession:
         return self.process is not None and self.process.poll() is None
     
     def record_path_today(self) -> str:
-        # Use server local date, aligned with segment_atclocktime behaviour
-        return datetime.now().strftime(self.record_template)
+        # Utilise la date de début du stream (pas de rotation)
+        return self.record_path
 
     def _writer_loop(self):
-        """Read TS from ffmpeg stdout and append to daily file, rotating at midnight."""
+        """Read TS from ffmpeg stdout and append to single file (no rotation)."""
         if not self.process or not self.process.stdout:
             logger.warning("Writer loop: pas de processus ou stdout", session_id=self.id)
             return
             
-        current_day = datetime.now().strftime("%Y-%m-%d")
-        current_path = self.record_path_today()
         os.makedirs(self.records_dir_for_person, exist_ok=True)
         
         logger.info("Writer loop démarré", 
                    session_id=self.id, 
                    person=self.person,
-                   current_path=current_path)
+                   record_path=self.record_path,
+                   start_date=self.start_date)
         
-        f = open(current_path, "ab", buffering=0)
+        f = open(self.record_path, "ab", buffering=0)
         total_bytes = 0
         chunk_count = 0
         
@@ -69,26 +69,6 @@ class FFmpegSession:
                                total_bytes=total_bytes,
                                chunk_count=chunk_count)
                     break
-                    
-                today = datetime.now().strftime("%Y-%m-%d")
-                if today != current_day:
-                    # Rotation jour
-                    logger.info("Rotation fichier jour", 
-                               session_id=self.id,
-                               old_day=current_day,
-                               new_day=today,
-                               bytes_written=total_bytes)
-                    try:
-                        f.flush()
-                        f.close()
-                    except Exception as e:
-                        logger.error("Erreur fermeture fichier rotation", 
-                                   session_id=self.id, 
-                                   error=str(e))
-                    current_day = today
-                    current_path = self.record_path_today()
-                    f = open(current_path, "ab", buffering=0)
-                    total_bytes = 0
                     
                 f.write(chunk)
                 total_bytes += len(chunk)
@@ -293,8 +273,8 @@ class FFmpegManager:
                     "created_at": sess.created_at,
                     "running": sess.is_running(),
                     "playback_url": sess.playback_url,
-                    "record_path": sess.record_path_today(),
-                    "record_template": sess.record_template,
+                    "record_path": sess.record_path,
+                    "start_date": sess.start_date,
                 })
             logger.debug("Liste status sessions", count=len(out), sessions=[s["id"] for s in out])
             return out

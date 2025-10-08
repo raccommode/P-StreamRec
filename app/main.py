@@ -824,6 +824,104 @@ async def delete_recording(username: str, filename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/recordings/recalculate-durations")
+async def recalculate_all_durations():
+    """Recalcule les durées de tous les enregistrements"""
+    from app.tasks.monitor import get_video_duration, generate_recording_thumbnail
+    
+    logger.info("🔄 API: Demande de recalcul des durées")
+    
+    try:
+        # Créer une tâche en arrière-plan
+        asyncio.create_task(_recalculate_durations_task())
+        
+        return {
+            "success": True,
+            "message": "Recalcul des durées démarré en arrière-plan"
+        }
+    except Exception as e:
+        logger.error("Erreur lancement recalcul durées", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _recalculate_durations_task():
+    """Tâche de recalcul des durées en arrière-plan"""
+    from app.tasks.monitor import get_video_duration, generate_recording_thumbnail
+    
+    logger.background_task("recalculate-durations", "Démarrage du recalcul")
+    
+    try:
+        # Récupérer tous les modèles
+        models = await db.get_all_models()
+        
+        total_processed = 0
+        total_updated = 0
+        
+        for model in models:
+            username = model['username']
+            records_dir = OUTPUT_DIR / "records" / username
+            
+            if not records_dir.exists():
+                continue
+            
+            logger.info(f"📁 Recalcul durées: {username}")
+            
+            ts_files = list(records_dir.glob("*.ts"))
+            
+            for ts_file in ts_files:
+                try:
+                    total_processed += 1
+                    
+                    # Récupérer l'enregistrement depuis la DB
+                    recordings = await db.get_recordings(username)
+                    existing_rec = next((r for r in recordings if r['filename'] == ts_file.name), None)
+                    
+                    current_duration = 0
+                    if existing_rec:
+                        current_duration = existing_rec.get('duration_seconds', 0)
+                    
+                    # Calculer la durée si elle est à 0
+                    if current_duration == 0:
+                        duration = await get_video_duration(ts_file, FFMPEG_PATH)
+                        
+                        if duration > 0:
+                            # Générer aussi la miniature
+                            thumbnail_path = await generate_recording_thumbnail(
+                                ts_file, OUTPUT_DIR, username, FFMPEG_PATH
+                            )
+                            
+                            # Mettre à jour dans la DB
+                            await db.add_or_update_recording(
+                                username=username,
+                                filename=ts_file.name,
+                                file_path=str(ts_file),
+                                file_size=ts_file.stat().st_size,
+                                duration_seconds=duration,
+                                thumbnail_path=thumbnail_path
+                            )
+                            
+                            total_updated += 1
+                            
+                            logger.success(f"Durée calculée: {ts_file.name} = {duration}s", 
+                                         username=username, 
+                                         duration=duration)
+                        
+                except Exception as e:
+                    logger.error(f"Erreur recalcul: {ts_file.name}", 
+                               username=username, 
+                               error=str(e))
+                    continue
+        
+        logger.success(f"✅ Recalcul terminé: {total_updated}/{total_processed} mis à jour",
+                      task="recalculate-durations")
+        
+    except Exception as e:
+        logger.error("Erreur tâche recalcul durées", 
+                    task="recalculate-durations", 
+                    error=str(e), 
+                    exc_info=True)
+
+
 # ============================================
 # Background Task - Auto-enregistrement
 # ============================================

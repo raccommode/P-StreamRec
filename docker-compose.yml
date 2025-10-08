@@ -17,7 +17,7 @@ services:
       - CB_RESOLVER_ENABLED=${CB_RESOLVER_ENABLED:-true}
       - AUTO_RECORD_USERS=${AUTO_RECORD_USERS:-}
       # - CB_COOKIE=session=...; autre=...   # Optionnel
-      - TZ=${TZ:-Europe/Paris}
+      - TZ=${TZ:-America/Toronto}
     ports:
       - "${HOST_PORT:-8080}:${PORT:-8080}"
     volumes:
