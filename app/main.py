@@ -8,6 +8,8 @@ import requests
 import json
 import subprocess
 import sys
+import time
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -15,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from .ffmpeg_runner import FFmpegManager
+from .logger import logger
 
 # Environment
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +31,29 @@ CB_RESOLVER_ENABLED = os.getenv("CB_RESOLVER_ENABLED", "false").lower() in {"1",
 # Ensure dirs
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+logger.info("📂 Répertoire de sortie", path=str(OUTPUT_DIR))
+logger.info("🎥 FFmpeg path", path=FFMPEG_PATH)
+logger.info("⚙️  HLS Configuration", hls_time=HLS_TIME, hls_list_size=HLS_LIST_SIZE)
+logger.info("🔧 Chaturbate Resolver", enabled=CB_RESOLVER_ENABLED)
+
 app = FastAPI(title="P-StreamRec", version="0.1.0")
+
+# Middleware pour logger toutes les requêtes
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    # Log requête
+    logger.api_request(request.method, request.url.path)
+    
+    # Traiter requête
+    response = await call_next(request)
+    
+    # Log réponse
+    duration_ms = (time.time() - start_time) * 1000
+    logger.api_response(response.status_code, request.url.path, duration_ms)
+    
+    return response
 
 # Configuration CORS permissive pour Umbrel
 app.add_middleware(
@@ -47,13 +72,12 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 async def serve_recording_protected(username: str, filename: str):
     """Sert un enregistrement avec vérification qu'il n'est pas en cours"""
     from fastapi.responses import FileResponse
-    from datetime import datetime
     
-    print(f"📹 Demande lecture: {username}/{filename}")
+    logger.api_request("GET", f"/streams/records/{username}/{filename}")
     
     # Sécurité: vérifier le nom de fichier
     if ".." in filename or "/" in filename or not filename.endswith(".ts"):
-        print(f"❌ Nom de fichier invalide: {filename}")
+        logger.warning("Tentative d'accès fichier invalide", username=username, filename=filename)
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     
     # Vérifier que ce n'est pas l'enregistrement du jour en cours
@@ -65,7 +89,7 @@ async def serve_recording_protected(username: str, filename: str):
     is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
     
     if is_recording and recording_date == today:
-        print(f"⚠️ Enregistrement en cours bloqué: {filename}")
+        logger.warning("Accès bloqué à enregistrement en cours", username=username, filename=filename, date=today)
         raise HTTPException(
             status_code=403, 
             detail="Cet enregistrement est en cours. Regardez le live à la place."
@@ -75,10 +99,11 @@ async def serve_recording_protected(username: str, filename: str):
     file_path = OUTPUT_DIR / "records" / username / filename
     
     if not file_path.exists():
-        print(f"❌ Fichier introuvable: {file_path}")
+        logger.error("Fichier introuvable", username=username, filename=filename, path=str(file_path))
         raise HTTPException(status_code=404, detail="Enregistrement introuvable")
     
-    print(f"✅ Envoi fichier: {file_path} ({file_path.stat().st_size / 1024 / 1024:.2f} MB)")
+    file_size = file_path.stat().st_size
+    logger.file_operation("Lecture", str(file_path), size=file_size)
     
     return FileResponse(
         path=str(file_path),
@@ -344,20 +369,20 @@ async def model_page():
 
 @app.post("/api/start")
 async def api_start(body: StartBody):
-    print(f"\n{'='*60}")
-    print(f"🎯 REQUÊTE /api/start")
-    print(f"{'='*60}")
-    print(f"📥 Body: {body}")
+    start_time = time.time()
+    logger.section("🎯 API /api/start - Démarrage Enregistrement")
+    logger.debug("Requête reçue", 
+                target=body.target, 
+                source_type=body.source_type,
+                person=body.person,
+                name=body.name)
     
     target = (body.target or "").strip()
     if not target:
-        print(f"❌ Champ 'target' vide")
+        logger.error("Champ 'target' vide dans la requête")
         raise HTTPException(status_code=400, detail="Champ 'target' requis")
 
-    print(f"🎯 Target: {target}")
-    print(f"🔖 Source type: {body.source_type}")
-    print(f"👤 Person: {body.person}")
-    print(f"📛 Name: {body.name}")
+    logger.info("Paramètres validés", target=target, source_type=body.source_type)
 
     m3u8_url: Optional[str] = None
     person: Optional[str] = (body.person or "").strip() or None
