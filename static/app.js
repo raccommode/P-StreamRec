@@ -141,6 +141,9 @@ async function updateModelsStatus() {
   try {
     const sessions = await getActiveSessions();
     const models = await getModels();
+    const liveGrid = document.getElementById('liveGrid');
+    const liveSection = document.getElementById('liveSection');
+    let liveCount = 0;
     
     for (const model of models) {
       const card = document.querySelector(`.model-card[data-username="${model.username}"]`);
@@ -148,6 +151,7 @@ async function updateModelsStatus() {
       
       const modelInfo = await getModelInfo(model.username);
       const isRecording = sessions.some(s => s.person === model.username && s.running);
+      const isLive = isRecording || modelInfo.isOnline;
       
       // Mettre à jour le statut de la carte
       card.className = `model-card ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
@@ -171,19 +175,34 @@ async function updateModelsStatus() {
       // Mettre à jour le texte de statut
       const statusDiv = card.querySelector('.model-status');
       if (statusDiv) {
-        const statusDot = statusDiv.querySelector('.status-dot');
-        if (statusDot) {
-          statusDot.className = `status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
-        }
         statusDiv.innerHTML = `
           <span class="status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}"></span>
-          ${isRecording ? 'En enregistrement' : modelInfo.isOnline ? 'En ligne' : 'Hors ligne'}
+          ${isRecording ? 'Recording' : modelInfo.isOnline ? 'Live' : 'Offline'}
           ${modelInfo.isOnline && modelInfo.viewers > 0 ? ` · ${modelInfo.viewers} viewers` : ''}
         `;
       }
+      
+      // DÉPLACER les cartes LIVE dans la section LIVE
+      if (isLive) {
+        liveCount++;
+        if (card.parentElement !== liveGrid) {
+          liveGrid.appendChild(card);
+        }
+      } else {
+        // Remettre dans la section principale si pas live
+        const mainGrid = document.getElementById('modelsGrid');
+        if (card.parentElement !== mainGrid) {
+          mainGrid.appendChild(card);
+        }
+      }
+    }
+    
+    // Afficher/masquer la section LIVE selon le nombre
+    if (liveSection) {
+      liveSection.style.display = liveCount > 0 ? 'contents' : 'none';
     }
   } catch (e) {
-    console.error('Erreur mise à jour statuts:', e);
+    console.error('Error updating status:', e);
   }
 }
 
@@ -200,6 +219,21 @@ async function renderModels() {
   
   emptyState.style.display = 'none';
   grid.innerHTML = '';
+  
+  // Section LIVE MODELS
+  const liveSection = document.createElement('div');
+  liveSection.id = 'liveSection';
+  liveSection.style.display = 'none'; // Masqué par défaut
+  liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+  grid.appendChild(liveSection);
+  
+  // Section OFFLINE MODELS
+  const offlineSection = document.createElement('div');
+  offlineSection.id = 'offlineSection';
+  offlineSection.style.gridColumn = '1 / -1';
+  offlineSection.style.display = 'contents';
+  offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
+  grid.appendChild(offlineSection);
   
   // Créer les cartes IMMÉDIATEMENT avec des placeholders
   for (const model of models) {

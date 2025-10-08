@@ -4,6 +4,8 @@
 
 All-in-one Docker container to watch and automatically record HLS/m3u8 streams, with a modern web interface.
 
+![P-StreamRec Interface](screen.png)
+
 ## Main Features
 
 - **Automatic recording** of Chaturbate streams by username
