@@ -412,43 +412,43 @@
     
     <div class="empty-state" id="emptyState">
       <div class="empty-state-icon">🎬</div>
-      <h3 data-i18n="noModels">Aucun modèle ajouté</h3>
-      <p data-i18n="noModelsDesc">Cliquez sur le bouton + pour ajouter un modèle Chaturbate</p>
+      <h3>No Models Added</h3>
+      <p>Click the + button to add a Chaturbate model</p>
     </div>
   </div>
 
   <!-- Modal pour ajouter un modèle -->
   <div class="modal" id="addModal">
     <div class="modal-content">
-      <h2 class="modal-header" data-i18n="addNewModel">Ajouter un modèle Chaturbate</h2>
+      <h2 class="modal-header">Add Chaturbate Model</h2>
       <form onsubmit="addModel(event)">
         <div class="form-group">
-          <label for="modelUrl" data-i18n="enterUrl">URL Chaturbate</label>
+          <label for="modelUrl">Chaturbate URL</label>
           <input 
             type="text" 
             id="modelUrl"
-            data-i18n="urlPlaceholder" 
+ 
             placeholder="https://chaturbate.com/username/" 
             required
           />
         </div>
         
         <div class="form-group">
-          <label for="recordQuality" data-i18n="recordQuality">Qualité d'enregistrement</label>
+          <label for="recordQuality">Recording Quality</label>
           <select id="recordQuality" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 1rem;">
-            <option value="best" data-i18n="qualityBest">🎯 Meilleure qualité (défaut)</option>
-            <option value="1080p" data-i18n="quality1080p">1080p (Full HD)</option>
-            <option value="720p" data-i18n="quality720p">720p (HD)</option>
-            <option value="480p" data-i18n="quality480p">480p (SD)</option>
-            <option value="360p" data-i18n="quality360p">360p (Faible)</option>
+            <option value="best">🎯 Best Quality (default)</option>
+            <option value="1080p">1080p (Full HD)</option>
+            <option value="720p">720p (HD)</option>
+            <option value="480p">480p (SD)</option>
+            <option value="360p">360p (Low)</option>
           </select>
-          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;" data-i18n="qualityDesc">
-            Qualité du flux enregistré (plus élevé = plus d'espace disque)
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Quality of recorded stream (higher = more disk space)
           </small>
         </div>
         
         <div class="form-group">
-          <label for="retentionDays" data-i18n="retentionDays">Durée de conservation (jours)</label>
+          <label for="retentionDays">Retention Period (days)</label>
           <input 
             type="number" 
             id="retentionDays"
@@ -458,14 +458,14 @@
             style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 1rem;"
             required
           />
-          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;" data-i18n="retentionDesc">
-            Les rediffusions plus anciennes seront automatiquement supprimées (défaut: 30 jours)
+          <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
+            Older recordings will be automatically deleted (default: 30 days)
           </small>
         </div>
         
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" onclick="closeAddModal()" data-i18n="cancel">Annuler</button>
-          <button type="submit" class="btn-primary" data-i18n="add">Ajouter</button>
+          <button type="button" class="btn-secondary" onclick="closeAddModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Add</button>
         </div>
       </form>
     </div>

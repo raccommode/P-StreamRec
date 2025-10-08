@@ -534,8 +534,8 @@
   <div class="container">
     <!-- Onglets -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('live')" data-i18n="live">📺 Live</button>
-      <button class="tab-btn" onclick="switchTab('recordings')" data-i18n="replays">📁 Rediffusions</button>
+      <button class="tab-btn active" onclick="switchTab('live')">📺 Live</button>
+      <button class="tab-btn" onclick="switchTab('recordings')">📁 Recordings</button>
     </div>
 
     <!-- Contenu Live -->
@@ -543,14 +543,14 @@
       <div class="player-container">
         <video id="player" class="video-player" controls muted autoplay></video>
         <div class="quality-selector" id="qualitySelector" style="display: none;">
-          <label for="qualitySelect">Qualité :</label>
+          <label for="qualitySelect">Quality:</label>
           <select id="qualitySelect" onchange="changeQuality(this.value)">
-            <option value="-1">🎯 Meilleure</option>
+            <option value="-1">🎯 Best</option>
           </select>
         </div>
         <div class="empty-message">
           <div class="icon">📺</div>
-          <p>Aucun stream en cours</p>
+          <p>No stream in progress</p>
         </div>
       </div>
     </div>
@@ -559,8 +559,8 @@
     <div id="tab-recordings" class="tab-content">
       <div class="recordings-section">
         <div class="section-header">
-          <span>📁 Enregistrements disponibles</span>
-          <span class="recording-meta" id="recordingsCount">0 fichier</span>
+          <span>📁 Available Recordings</span>
+          <span class="recording-meta" id="recordingsCount">0 files</span>
         </div>
         <div class="recordings-list" id="recordingsList">
           <!-- Les enregistrements seront ajoutés ici -->
@@ -572,24 +572,24 @@
   <!-- Modal Paramètres -->
   <div class="modal" id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="background: var(--bg-card); padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
-      <h2 style="margin-bottom: 1.5rem; color: var(--text-primary);">⚙️ Paramètres du modèle</h2>
+      <h2 style="margin-bottom: 1.5rem; color: var(--text-primary);">⚙️ Model Settings</h2>
       <form onsubmit="saveSettings(event)">
         <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label for="settingsQuality" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Qualité d'enregistrement</label>
+          <label for="settingsQuality" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Recording Quality</label>
           <select id="settingsQuality" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1rem;">
-            <option value="best">🎯 Meilleure qualité (défaut)</option>
+            <option value="best">🎯 Best Quality (default)</option>
             <option value="1080p">1080p (Full HD)</option>
             <option value="720p">720p (HD)</option>
             <option value="480p">480p (SD)</option>
-            <option value="360p">360p (Faible)</option>
+            <option value="360p">360p (Low)</option>
           </select>
           <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
-            Qualité du flux enregistré (plus élevé = plus d'espace disque)
+            Quality of recorded stream (higher = more disk space)
           </small>
         </div>
         
         <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label for="settingsRetention" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Durée de conservation (jours)</label>
+          <label for="settingsRetention" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Retention Period (days)</label>
           <input 
             type="number" 
             id="settingsRetention"
@@ -599,7 +599,7 @@
             required
           />
           <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; display: block;">
-            Les rediffusions plus anciennes seront automatiquement supprimées (défaut: 30 jours)
+            Older recordings will be automatically deleted (default: 30 days)
           </small>
         </div>
         
@@ -610,19 +610,19 @@
               id="settingsAutoRecord"
               style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent);"
             />
-            <span>🤖 Enregistrement automatique</span>
+            <span>🤖 Auto-record</span>
           </label>
           <small style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem; display: block; margin-left: 2rem;">
-            Le serveur enregistre automatiquement quand le modèle est en ligne (vérifié toutes les 2 minutes)
+            Server automatically records when model goes online (checked every 2 minutes)
           </small>
         </div>
         
         <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
           <button type="button" onclick="closeSettingsModal()" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 1rem;">
-            Annuler
+            Cancel
           </button>
           <button type="submit" style="padding: 0.75rem 1.5rem; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-size: 1rem; font-weight: 500;">
-            💾 Enregistrer
+            💾 Save
           </button>
         </div>
       </form>
@@ -634,7 +634,7 @@
           🗑️ Delete this model
         </button>
         <div style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
-          Cette action est irréversible
+          This action is irreversible
         </div>
       </div>
     </div>
