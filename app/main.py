@@ -569,7 +569,61 @@ async def get_thumbnail(username: str):
                 headers={"Cache-Control": "public, max-age=60"}
             )
     
-    # Fallback: essayer Chaturbate
+    # Si offline: générer depuis la dernière rediffusion
+    offline_thumbs_dir = OUTPUT_DIR / "thumbnails" / "offline"
+    offline_thumbs_dir.mkdir(parents=True, exist_ok=True)
+    offline_thumb_path = offline_thumbs_dir / f"{username}.jpg"
+    
+    # Chercher la dernière rediffusion
+    records_dir = OUTPUT_DIR / "records" / username
+    if records_dir.exists():
+        ts_files = sorted(records_dir.glob("*.ts"), reverse=True)
+        
+        if ts_files and (not offline_thumb_path.exists() or (time.time() - offline_thumb_path.stat().st_mtime > 86400)):
+            # Prendre la dernière rediffusion
+            latest_recording = ts_files[0]
+            
+            try:
+                # Extraire durée de la vidéo
+                duration_result = subprocess.run([
+                    FFMPEG_PATH, "-i", str(latest_recording),
+                    "-f", "null", "-"
+                ], capture_output=True, text=True, timeout=5)
+                
+                # Parser la durée depuis stderr
+                duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', duration_result.stderr)
+                if duration_match:
+                    hours = int(duration_match.group(1))
+                    minutes = int(duration_match.group(2))
+                    seconds = int(duration_match.group(3))
+                    total_seconds = hours * 3600 + minutes * 60 + seconds
+                    
+                    # Prendre une frame au milieu de la vidéo
+                    middle_timestamp = total_seconds // 2
+                    
+                    # Extraire la frame
+                    subprocess.run([
+                        FFMPEG_PATH, "-ss", str(middle_timestamp),
+                        "-i", str(latest_recording),
+                        "-vframes", "1",
+                        "-vf", "scale=280:-1",
+                        "-y",
+                        str(offline_thumb_path)
+                    ], capture_output=True, timeout=10, check=False)
+            except Exception as e:
+                logger.warning("Erreur extraction thumbnail offline", 
+                             username=username, 
+                             error=str(e))
+        
+        # Retourner la miniature offline si elle existe
+        if offline_thumb_path.exists():
+            return FileResponse(
+                path=str(offline_thumb_path),
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
+    
+    # Fallback final: essayer Chaturbate
     try:
         img_urls = [
             f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
