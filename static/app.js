@@ -199,83 +199,18 @@ async function renderModels() {
   }
   
   emptyState.style.display = 'none';
-  grid.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">⏳ Chargement...</p>';
-  
-  // Récupérer les sessions actives
-  const sessions = await getActiveSessions();
-  
-  // OPTIMISATION: Charger toutes les infos en PARALLÈLE
-  const modelsData = await Promise.all(
-    models.map(async (model) => {
-      const [modelInfo, recordingsRes] = await Promise.all([
-        getModelInfo(model.username),
-        fetch(`/api/recordings/${model.username}`).catch(() => null)
-      ]);
-      
-      let recordingsCount = 0;
-      let lastRecording = null;
-      
-      if (recordingsRes && recordingsRes.ok) {
-        const recData = await recordingsRes.json();
-        recordingsCount = recData.recordings?.length || 0;
-        if (recData.recordings && recData.recordings.length > 0) {
-          lastRecording = recData.recordings[0].date;
-        }
-      }
-      
-      return {
-        username: model.username,
-        isOnline: modelInfo.isOnline,
-        thumbnail: modelInfo.thumbnail,
-        viewers: modelInfo.viewers,
-        recordingsCount,
-        lastRecording
-      };
-    })
-  );
-  
-  // TRI: par date de dernière diffusion puis alphabétique
-  modelsData.sort((a, b) => {
-    // D'abord par enregistrement actif
-    const aRecording = sessions.some(s => s.person === a.username && s.running);
-    const bRecording = sessions.some(s => s.person === b.username && s.running);
-    if (aRecording && !bRecording) return -1;
-    if (!aRecording && bRecording) return 1;
-    
-    // Puis par date de dernière diffusion (plus récent d'abord)
-    if (a.lastRecording && b.lastRecording) {
-      if (a.lastRecording > b.lastRecording) return -1;
-      if (a.lastRecording < b.lastRecording) return 1;
-    } else if (a.lastRecording && !b.lastRecording) return -1;
-    else if (!a.lastRecording && b.lastRecording) return 1;
-    
-    // Enfin par ordre alphabétique
-    return a.username.localeCompare(b.username);
-  });
-  
-  // Vider et recréer les cartes
   grid.innerHTML = '';
   
-  for (const model of modelsData) {
-    const isRecording = sessions.some(s => s.person === model.username && s.running);
-    
-    let statusClass = 'offline';
-    if (isRecording) {
-      statusClass = 'recording';
-    } else if (model.isOnline) {
-      statusClass = 'online';
-    }
-    
+  // Créer les cartes IMMÉDIATEMENT avec des placeholders
+  for (const model of models) {
     const card = document.createElement('div');
-    card.className = `model-card ${statusClass}`;
+    card.className = 'model-card offline';
     card.setAttribute('data-username', model.username);
     card.onclick = () => openModelPage(model.username);
     
     card.innerHTML = `
-      ${isRecording ? '<div class="badge recording">REC</div>' : ''}
-      ${model.isOnline && !isRecording ? '<div class="badge live">LIVE</div>' : ''}
       <img 
-        src="${model.thumbnail}" 
+        src="https://roomimg.stream.highwebmedia.com/ri/${model.username}.jpg" 
         alt="${model.username}"
         class="model-thumbnail"
         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
@@ -283,21 +218,17 @@ async function renderModels() {
       <div class="model-info">
         <div class="model-name">${model.username}</div>
         <div class="model-status">
-          <span class="status-dot ${isRecording ? 'recording' : model.isOnline ? 'online' : 'offline'}"></span>
-          ${isRecording ? 'En enregistrement' : model.isOnline ? 'En ligne' : 'Hors ligne'}
-          ${model.isOnline && model.viewers > 0 ? ` · ${model.viewers} viewers` : ''}
+          <span class="status-dot offline"></span>
+          Loading...
         </div>
-        ${model.recordingsCount > 0 ? `
-          <div class="model-recordings">
-            <span class="recordings-count">📁 ${model.recordingsCount} rediffusion${model.recordingsCount > 1 ? 's' : ''}</span>
-            ${model.lastRecording ? `<span class="last-recording">📅 Dernier: ${model.lastRecording}</span>` : ''}
-          </div>
-        ` : ''}
       </div>
     `;
     
     grid.appendChild(card);
   }
+  
+  // Ensuite mettre à jour dynamiquement les statuts
+  updateModelsStatus();
 }
 
 // ============================================
