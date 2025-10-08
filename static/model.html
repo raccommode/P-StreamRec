@@ -665,6 +665,108 @@
       initAttempts++;
     }, 100);
 
+    // ============================================
+    // FONCTIONS GLOBALES (appelées depuis HTML)
+    // ============================================
+    
+    // Switch entre onglets
+    window.switchTab = function(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      if (tabName === 'recordings') {
+        loadRecordings();
+      }
+    };
+    
+    // Ouvrir modal settings
+    window.openSettingsModal = async function() {
+      try {
+        const res = await fetch('/api/models');
+        if (res.ok) {
+          const data = await res.json();
+          const model = data.models.find(m => m.username === username);
+          if (model) {
+            document.getElementById('settingsQuality').value = model.recordQuality || 'best';
+            document.getElementById('settingsRetention').value = model.retentionDays || 30;
+            document.getElementById('settingsAutoRecord').checked = model.autoRecord !== false;
+          }
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      }
+      document.getElementById('settingsModal').style.display = 'flex';
+    };
+    
+    // Fermer modal settings
+    window.closeSettingsModal = function() {
+      document.getElementById('settingsModal').style.display = 'none';
+    };
+    
+    // Sauvegarder settings
+    window.saveSettings = async function(e) {
+      e.preventDefault();
+      const quality = document.getElementById('settingsQuality').value;
+      const retention = parseInt(document.getElementById('settingsRetention').value);
+      const autoRecord = document.getElementById('settingsAutoRecord').checked;
+      
+      try {
+        const res = await fetch(`/api/models/${username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordQuality: quality, retentionDays: retention, autoRecord })
+        });
+        if (res.ok) {
+          showNotification('Settings saved', 'success');
+          closeSettingsModal();
+        } else {
+          showNotification('Save failed', 'error');
+        }
+      } catch (e) {
+        showNotification('Connection error', 'error');
+      }
+    };
+    
+    // Supprimer depuis modal
+    window.deleteModelFromSettings = async function() {
+      if (!confirm(`Delete ${username} from your list?`)) return;
+      try {
+        const res = await fetch(`/api/models/${username}`, { method: 'DELETE' });
+        if (res.ok) {
+          showNotification('Model deleted', 'success');
+          setTimeout(() => window.location.href = '/', 1000);
+        }
+      } catch (e) {
+        showNotification('Delete failed', 'error');
+      }
+    };
+    
+    // Lire recording
+    window.playRecording = function(url, filename) {
+      currentRecordingFile = filename;
+      const video = document.getElementById('video');
+      video.src = url;
+      video.play();
+      loadWatchProgress(filename);
+    };
+    
+    // Supprimer recording
+    window.deleteRecording = async function(filename) {
+      if (!confirm('Delete this recording?')) return;
+      try {
+        const res = await fetch(`/api/recordings/${username}/${filename}`, { method: 'DELETE' });
+        if (res.ok) {
+          showNotification('Recording deleted', 'success');
+          const key = `watch_progress_${username}_${filename}`;
+          localStorage.removeItem(key);
+          loadRecordings();
+        }
+      } catch (e) {
+        showNotification('Delete failed', 'error');
+      }
+    };
+
     function initializePage() {
 
     // Récupérer l'état du modèle
@@ -1117,158 +1219,7 @@
       // Retourner à l'onglet Live pour voir le lecteur
       switchTab('live');
       
-      showNotification('Chargement de la rediffusion...', 'info');
-    }
-    
-    // Supprimer un enregistrement
-    async function deleteRecording(filename) {
-      if (!confirm(`Supprimer ${filename.replace('.ts', '')} ?\n\nCette action est irréversible.`)) {
-        return;
-      }
-      
-      try {
-        const res = await fetch(`/api/recordings/${username}/${filename}`, {
-          method: 'DELETE'
-        });
-        
-        if (res.ok) {
-          showNotification('Enregistrement supprimé', 'info');
-          // Supprimer aussi la progression
-          const key = `watch_progress_${username}_${filename}`;
-          localStorage.removeItem(key);
-          // Recharger la liste
-          loadRecordings();
-        } else {
-          showNotification('Erreur lors de la suppression', 'error');
-        }
-      } catch (e) {
-        console.error('Erreur suppression:', e);
-        showNotification('Erreur lors de la suppression', 'error');
-      }
-    }
-
-    // Paramètres du modèle
-    async function openSettingsModal() {
-      // Charger les paramètres actuels du modèle
-      try {
-        const res = await fetch('/api/models');
-        if (res.ok) {
-          const data = await res.json();
-          const model = data.models.find(m => m.username === username);
-          
-          if (model) {
-            document.getElementById('settingsQuality').value = model.recordQuality || 'best';
-            document.getElementById('settingsRetention').value = model.retentionDays || 30;
-            document.getElementById('settingsAutoRecord').checked = model.autoRecord !== false; // Par défaut true
-          } else {
-            // Valeurs par défaut si le modèle n'existe pas
-            document.getElementById('settingsQuality').value = 'best';
-            document.getElementById('settingsRetention').value = 30;
-            document.getElementById('settingsAutoRecord').checked = true;
-          }
-        }
-      } catch (e) {
-        console.error('Erreur chargement paramètres:', e);
-      }
-      
-      // Mettre à jour le bouton d'enregistrement manuel
-      updateManualRecordButton();
-      
-      // Afficher le modal
-      document.getElementById('settingsModal').style.display = 'flex';
-    }
-    
-    // Mettre à jour le bouton d'enregistrement manuel
-    function updateManualRecordButton() {
-      const btn = document.getElementById('manualRecordBtn');
-      if (!btn) return;
-      
-      if (currentSession && currentSession.running) {
-        btn.innerHTML = '⏹️ Arrêter l\'enregistrement';
-        btn.style.borderColor = 'var(--danger)';
-        btn.style.color = 'var(--danger)';
-        btn.style.background = 'rgba(239, 68, 68, 0.1)';
-      } else {
-        btn.innerHTML = '⏺ Démarrer l\'enregistrement';
-        btn.style.borderColor = 'var(--accent)';
-        btn.style.color = 'var(--accent)';
-        btn.style.background = 'rgba(99, 102, 241, 0.1)';
-      }
-    }
-    
-    function closeSettingsModal() {
-      document.getElementById('settingsModal').style.display = 'none';
-    }
-    
-    async function saveSettings(event) {
-      event.preventDefault();
-      
-      const quality = document.getElementById('settingsQuality').value;
-      const retention = parseInt(document.getElementById('settingsRetention').value);
-      const autoRecord = document.getElementById('settingsAutoRecord').checked;
-      
-      try {
-        const res = await fetch(`/api/models/${username}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            recordQuality: quality,
-            retentionDays: retention,
-            autoRecord: autoRecord
-          })
-        });
-        
-        if (res.ok) {
-          showNotification('Paramètres sauvegardés', 'success');
-          closeSettingsModal();
-        } else {
-          showNotification('Erreur lors de la sauvegarde', 'error');
-        }
-      } catch (e) {
-        console.error('Erreur sauvegarde paramètres:', e);
-        showNotification('Erreur de connexion', 'error');
-      }
-    }
-    
-    // Supprimer le modèle depuis les paramètres
-    async function deleteModelFromSettings() {
-      if (!confirm(`Voulez-vous vraiment supprimer ${username} de votre liste ?\n\nCette action est irréversible.`)) {
-        return;
-      }
-      
-      try {
-        const res = await fetch(`/api/models/${username}`, {
-          method: 'DELETE'
-        });
-        
-        if (res.ok) {
-          showNotification('Modèle supprimé');
-          setTimeout(() => window.location.href = '/', 1000);
-        } else {
-          showNotification('Erreur lors de la suppression', 'error');
-        }
-      } catch (e) {
-        console.error('Erreur suppression modèle:', e);
-        showNotification('Erreur de connexion', 'error');
-      }
-    }
-
-    // Switch entre onglets
-    function switchTab(tabName) {
-      // Gérer les boutons
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
-      
-      // Gérer le contenu
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      document.getElementById(`tab-${tabName}`).classList.add('active');
-      
-      // Si onglet recordings, charger la liste
-      if (tabName === 'recordings') {
-        loadRecordings();
-      }
+      showNotification('Loading replay...', 'info');
     }
 
     // Supprimer le modèle
