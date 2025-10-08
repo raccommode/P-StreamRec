@@ -650,8 +650,22 @@
       window.location.href = '/';
     }
 
-    // Initialisation
-    document.getElementById('modelName').textContent = username;
+    // Attendre que le DOM soit chargé ET que le header soit injecté
+    let initAttempts = 0;
+    const initInterval = setInterval(() => {
+      const modelNameEl = document.getElementById('modelName');
+      if (modelNameEl || initAttempts > 20) {
+        clearInterval(initInterval);
+        if (modelNameEl) {
+          modelNameEl.textContent = username;
+          // Lancer l'initialisation
+          initializePage();
+        }
+      }
+      initAttempts++;
+    }, 100);
+
+    function initializePage() {
 
     // Récupérer l'état du modèle
     async function updateModelStatus() {
@@ -1361,6 +1375,8 @@
     
     // Rafraîchir toutes les 10 secondes (moins agressif)
     setInterval(updateModelStatus, 10000);
+    
+    } // Fin de initializePage()
   </script>
   
   <div id="footer-placeholder"></div>
