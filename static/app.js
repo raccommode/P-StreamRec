@@ -214,15 +214,17 @@ async function updateModelsStatus() {
       // Mettre à jour la miniature
       const thumbnail = card.querySelector('.model-thumbnail');
       if (thumbnail) {
-        // Live/Recording : Couleur + rafraîchir
         if (isLive) {
+          // Live/Recording : Couleur + rafraîchir la miniature depuis le stream
           thumbnail.style.filter = 'none';
-          // Rafraîchir la miniature (cache bust)
-          const baseUrl = modelInfo.thumbnail.split('?')[0];
-          thumbnail.src = `${baseUrl}?t=${Date.now()}`;
+          thumbnail.src = `/api/thumbnail/${model.username}?t=${Date.now()}`;
         } else {
-          // Offline : Noir et blanc
+          // Offline : Noir et blanc (garde la miniature de la dernière rediffusion en cache)
           thumbnail.style.filter = 'grayscale(100%) brightness(0.7)';
+          // Ne pas changer l'URL pour garder la miniature générée en cache
+          if (!thumbnail.src.includes('/api/thumbnail/')) {
+            thumbnail.src = `/api/thumbnail/${model.username}`;
+          }
         }
       }
       
@@ -288,7 +290,7 @@ async function renderModels() {
     
     card.innerHTML = `
       <img 
-        src="https://roomimg.stream.highwebmedia.com/ri/${model.username}.jpg" 
+        src="/api/thumbnail/${model.username}" 
         alt="${model.username}"
         class="model-thumbnail"
         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
