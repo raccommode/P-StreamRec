@@ -136,6 +136,57 @@ async function getModelInfo(username) {
 // Afficher les modèles
 // ============================================
 
+// Mise à jour dynamique des statuts sans recréer les cartes
+async function updateModelsStatus() {
+  try {
+    const sessions = await getActiveSessions();
+    const models = await getModels();
+    
+    for (const model of models) {
+      const card = document.querySelector(`.model-card[data-username="${model.username}"]`);
+      if (!card) continue; // Carte pas encore créée
+      
+      const modelInfo = await getModelInfo(model.username);
+      const isRecording = sessions.some(s => s.person === model.username && s.running);
+      
+      // Mettre à jour le statut de la carte
+      card.className = `model-card ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
+      
+      // Mettre à jour les badges
+      const existingBadges = card.querySelectorAll('.badge');
+      existingBadges.forEach(b => b.remove());
+      
+      if (isRecording) {
+        const badge = document.createElement('div');
+        badge.className = 'badge recording';
+        badge.textContent = 'REC';
+        card.insertBefore(badge, card.firstChild);
+      } else if (modelInfo.isOnline) {
+        const badge = document.createElement('div');
+        badge.className = 'badge live';
+        badge.textContent = 'LIVE';
+        card.insertBefore(badge, card.firstChild);
+      }
+      
+      // Mettre à jour le texte de statut
+      const statusDiv = card.querySelector('.model-status');
+      if (statusDiv) {
+        const statusDot = statusDiv.querySelector('.status-dot');
+        if (statusDot) {
+          statusDot.className = `status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
+        }
+        statusDiv.innerHTML = `
+          <span class="status-dot ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}"></span>
+          ${isRecording ? 'En enregistrement' : modelInfo.isOnline ? 'En ligne' : 'Hors ligne'}
+          ${modelInfo.isOnline && modelInfo.viewers > 0 ? ` · ${modelInfo.viewers} viewers` : ''}
+        `;
+      }
+    }
+  } catch (e) {
+    console.error('Erreur mise à jour statuts:', e);
+  }
+}
+
 async function renderModels() {
   const models = await getModels();
   const grid = document.getElementById('modelsGrid');
@@ -336,8 +387,8 @@ async function checkAndStartRecordings() {
           
           if (res.ok) {
             console.log(`✅ Enregistrement démarré automatiquement pour ${username}`);
-            // Rafraîchir immédiatement pour voir le changement
-            await renderModels();
+            // Mettre à jour juste les statuts sans tout recharger
+            await updateModelsStatus();
           } else if (res.status === 409) {
             // Session déjà en cours, c'est normal, on ignore
             console.log(`⏭️ Session déjà en cours pour ${username}, skip`);
@@ -375,8 +426,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Afficher les modèles
   renderModels();
   
-  // Ne PAS rafraîchir automatiquement pour éviter les doublons
-  // L'utilisateur peut rafraîchir manuellement la page (F5) si besoin
+  // Mettre à jour les statuts toutes les 30 secondes (dynamique, sans recharger)
+  setInterval(updateModelsStatus, 30000);
   
   // Vérifier et démarrer les enregistrements toutes les 60 secondes
   setInterval(checkAndStartRecordings, 60000);

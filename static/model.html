@@ -841,12 +841,15 @@
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('✅ Manifest chargé, démarrage lecture...');
           
-          // FORCER LA MEILLEURE QUALITÉ
+          // FORCER LA MEILLEURE QUALITÉ IMMÉDIATEMENT
           if (hlsPlayer.levels.length > 0) {
             const highestLevel = hlsPlayer.levels.length - 1;
-            hlsPlayer.loadLevel = highestLevel;  // Forcer le niveau le plus élevé
-            hlsPlayer.autoLevelCapping = highestLevel;  // Limiter le plafond auto au max
+            hlsPlayer.currentLevel = highestLevel;  // Forcer immédiatement
+            hlsPlayer.loadLevel = highestLevel;  // Forcer le chargement
+            hlsPlayer.autoLevelCapping = highestLevel;  // Limiter le plafond
+            hlsPlayer.startLevel = highestLevel;  // Démarrer au max
             console.log(`🎚️ Meilleure qualité forcée: ${hlsPlayer.levels[highestLevel].height}p`);
+            showNotification(`Qualité: ${hlsPlayer.levels[highestLevel].height}p (Max)`, 'success');
           }
           
           // Afficher le sélecteur de qualité si plusieurs niveaux disponibles
