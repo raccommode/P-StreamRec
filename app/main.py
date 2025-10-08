@@ -141,7 +141,7 @@ def save_models_to_file(models):
             json.dump(models, f, indent=2)
         return True
     except Exception as e:
-        print(f"Erreur sauvegarde modèles: {e}")
+        logger.error("Erreur sauvegarde modèles", exc_info=True, error=str(e))
         return False
 
 
@@ -351,7 +351,7 @@ async def git_update():
 async def restart_application():
     """Redémarre l'application après un délai"""
     await asyncio.sleep(2)
-    print("🔄 Restarting application after GitOps update...")
+    logger.info("🔄 Redémarrage application après GitOps update")
     
     # Si on utilise uvicorn avec --reload, toucher un fichier Python suffit
     try:
@@ -389,39 +389,37 @@ async def api_start(body: StartBody):
 
     # Determine source type
     stype = (body.source_type or "").lower().strip()
-    print(f"📌 Source type déterminé: {stype or 'auto'}")
+    logger.debug("Détermination type source", source_type=stype or 'auto', target=target)
 
     if stype == "m3u8" or target.startswith("http://") or target.startswith("https://"):
-        print(f"✅ URL M3U8 directe détectée")
+        logger.info("URL M3U8 directe détectée", url=target[:80])
         m3u8_url = target
     else:
-        print(f"🔍 Résolution Chaturbate requise...")
+        logger.subsection("Résolution Chaturbate")
         # Try chaturbate if allowed or explicit
         if stype in ("", "chaturbate"):
             if not CB_RESOLVER_ENABLED:
-                print(f"❌ CB_RESOLVER_ENABLED est désactivé")
+                logger.error("Chaturbate Resolver désactivé", CB_RESOLVER_ENABLED=False)
                 raise HTTPException(status_code=400, detail="Résolution Chaturbate désactivée. Fournissez une URL m3u8 directe ou activez CB_RESOLVER_ENABLED.")
             try:
-                print(f"🔄 Appel du resolver Chaturbate...")
+                logger.progress("Appel Chaturbate Resolver", username=target)
                 from .resolvers.chaturbate import resolve_m3u8 as resolve_chaturbate
                 m3u8_url = resolve_chaturbate(target)
                 if not m3u8_url:
-                    print(f"❌ Resolver a retourné None")
+                    logger.error("Resolver retourné None", username=target)
                     raise HTTPException(status_code=400, detail=f"Impossible de trouver le flux pour {target}")
-                print(f"✅ M3U8 résolu: {m3u8_url}")
+                logger.success("M3U8 résolu", username=target, url=m3u8_url[:80])
                 if not person:
                     person = target  # username
-                    print(f"👤 Person défini: {person}")
+                    logger.debug("Person défini depuis target", person=person)
             except HTTPException:
                 raise
             except Exception as e:
-                import traceback
                 error_detail = f"Échec résolution Chaturbate pour {target}: {str(e)}"
-                print(f"❌ ERROR: {error_detail}")
-                print(traceback.format_exc())
+                logger.error(error_detail, exc_info=True, username=target)
                 raise HTTPException(status_code=400, detail=error_detail)
         else:
-            print(f"❌ Source type invalide: {stype}")
+            logger.error("Source type invalide", source_type=stype)
             raise HTTPException(status_code=400, detail="source_type invalide. Utilisez 'm3u8' ou 'chaturbate'.")
 
     # If person still not set (direct m3u8), infer from URL
@@ -437,24 +435,22 @@ async def api_start(body: StartBody):
             person = "session"
 
     person = slugify(person)
-    print(f"🔖 Person slugifié: {person}")
-    print(f"\n🚀 Démarrage de la session FFmpeg...")
+    logger.info("Identifiant slugifié", person=person, display_name=body.name)
 
+    logger.subsection("🚀 Démarrage Session FFmpeg")
     try:
         sess = manager.start_session(m3u8_url, person=person, display_name=body.name)
-        print(f"✅ Session créée avec succès: {sess.id}")
+        duration_ms = (time.time() - start_time) * 1000
+        logger.success("Session créée avec succès", 
+                      session_id=sess.id,
+                      person=person,
+                      duration_ms=f"{duration_ms:.2f}")
     except RuntimeError as e:
-        print(f"❌ RuntimeError: {e}")
+        logger.error("Session déjà en cours", person=person, error=str(e))
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
-        print(f"❌ Exception: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.critical("Erreur création session", exc_info=True, person=person, error=str(e))
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
-
-    print(f"{'='*60}")
-    print(f"✅ SUCCÈS - Session {sess.id} démarrée")
-    print(f"{'='*60}\n")
 
     return {
         "id": sess.id,
@@ -678,7 +674,7 @@ async def list_recordings(username: str):
                     if result.returncode == 0 and result.stdout.strip():
                         duration_seconds = int(float(result.stdout.strip()))
             except Exception as e:
-                print(f"⚠️ Erreur calcul durée pour {ts_file.name}: {e}")
+                logger.warning("Erreur calcul durée fichier", filename=ts_file.name, error=str(e))
                 pass
             
             # Formater la durée
@@ -934,7 +930,7 @@ async def auto_record_task():
                         
                         if hls_source:
                             # Modèle en ligne avec flux HLS disponible
-                            print(f"🔴 Auto-démarrage enregistrement: {username}")
+                            logger.background_task("auto-record", f"Modèle en ligne: {username}")
                             
                             # Lancer l'enregistrement
                             try:
@@ -945,17 +941,26 @@ async def auto_record_task():
                                 )
                                 
                                 if sess:
-                                    print(f"✅ Enregistrement démarré: {username} (ID: {sess.id})")
+                                    logger.success("Auto-enregistrement démarré", 
+                                                 task="auto-record",
+                                                 username=username,
+                                                 session_id=sess.id)
                             except RuntimeError as e:
-                                print(f"⚠️ Impossible de démarrer {username}: {e}")
+                                logger.warning("Impossible démarrer enregistrement",
+                                             task="auto-record",
+                                             username=username,
+                                             error=str(e))
                                 continue
                             
                 except Exception as e:
-                    print(f"Erreur vérification {username}: {e}")
+                    logger.error("Erreur vérification modèle",
+                               task="auto-record",
+                               username=username,
+                               error=str(e))
                     continue
                 
         except Exception as e:
-            print(f"Erreur auto-record task: {e}")
+            logger.error("Erreur auto-record task", task="auto-record", exc_info=True, error=str(e))
             await asyncio.sleep(60)
 
 
@@ -967,7 +972,7 @@ async def cleanup_old_recordings_task():
         try:
             await asyncio.sleep(3600)  # Vérifier toutes les heures
             
-            print("🧹 Nettoyage des anciennes rediffusions...")
+            logger.background_task("cleanup", "Début nettoyage anciennes rediffusions")
             
             # Charger les modèles avec leurs paramètres de rétention
             models = load_models()
@@ -998,8 +1003,14 @@ async def cleanup_old_recordings_task():
                         # Si le fichier est plus vieux que la limite
                         if file_date < cutoff_date:
                             # Supprimer le fichier TS
+                            file_size = ts_file.stat().st_size
                             ts_file.unlink()
-                            print(f"🗑️ Supprimé: {username}/{ts_file.name} (>{retention_days} jours)")
+                            logger.info("Fichier supprimé (rétention)",
+                                      task="cleanup",
+                                      username=username,
+                                      filename=ts_file.name,
+                                      retention_days=retention_days,
+                                      size_mb=f"{file_size / 1024 / 1024:.1f}")
                             
                             # Supprimer la miniature associée
                             thumb_file = thumbnails_dir / f"{ts_file.stem}.jpg"
@@ -1020,11 +1031,14 @@ async def cleanup_old_recordings_task():
                                     pass
                                     
                     except Exception as e:
-                        print(f"Erreur nettoyage {ts_file.name}: {e}")
+                        logger.error("Erreur nettoyage fichier",
+                                   task="cleanup",
+                                   filename=ts_file.name,
+                                   error=str(e))
                         continue
                         
         except Exception as e:
-            print(f"Erreur cleanup task: {e}")
+            logger.error("Erreur cleanup task", task="cleanup", exc_info=True, error=str(e))
             await asyncio.sleep(3600)
 
 
@@ -1033,4 +1047,4 @@ async def startup_event():
     """Démarre les background tasks au démarrage de l'application"""
     asyncio.create_task(auto_record_task())
     asyncio.create_task(cleanup_old_recordings_task())
-    print("🚀 Background tasks démarrés: auto-enregistrement + nettoyage")
+    logger.info("🚀 Background tasks démarrés", tasks=["auto-record", "cleanup"])
