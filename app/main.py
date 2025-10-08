@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from .ffmpeg_runner import FFmpegManager
 from .logger import logger
+from .core.database import Database
+from .tasks.monitor import monitor_models_task
 
 # Environment
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -120,6 +122,10 @@ app.mount("/streams/sessions", StaticFiles(directory=str(OUTPUT_DIR / "sessions"
 app.mount("/streams/thumbnails", StaticFiles(directory=str(OUTPUT_DIR / "thumbnails")), name="streams_thumbnails")
 
 manager = FFmpegManager(str(OUTPUT_DIR), ffmpeg_path=FFMPEG_PATH, hls_time=HLS_TIME, hls_list_size=HLS_LIST_SIZE)
+
+# Database SQLite
+DB_FILE = OUTPUT_DIR / "streamrec.db"
+db = Database(DB_FILE)
 
 # Fichier de sauvegarde des modèles (côté serveur)
 MODELS_FILE = OUTPUT_DIR / "models.json"
@@ -478,42 +484,19 @@ async def api_stop(session_id: str):
 
 @app.get("/api/model/{username}/status")
 async def get_model_status(username: str):
-    """Récupère le statut et les infos d'un modèle Chaturbate"""
-    if not CB_RESOLVER_ENABLED:
-        raise HTTPException(status_code=400, detail="Résolution Chaturbate désactivée")
+    """Récupère le statut et les infos d'un modèle depuis le cache SQLite"""
+    # Lire directement depuis le cache SQLite (mis à jour par la tâche de monitoring)
+    model = await db.get_model(username)
     
-    try:
-        import requests
-        url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
+    if model:
+        return {
+            "username": username,
+            "isOnline": bool(model.get('is_online')),
+            "thumbnail": f"/api/thumbnail/{username}",
+            "viewers": model.get('viewers', 0)
         }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Utiliser le proxy local pour les miniatures
-            thumbnail = f"/api/thumbnail/{username}"
-            
-            return {
-                "username": username,
-                "isOnline": data.get("room_status") == "public" or bool(data.get("hls_source")),
-                "thumbnail": thumbnail,
-                "viewers": data.get("num_users", 0)
-            }
-        else:
-            # Fallback si l'API ne répond pas
-            return {
-                "username": username,
-                "isOnline": False,
-                "thumbnail": f"/api/thumbnail/{username}",
-                "viewers": 0
-            }
-    except Exception as e:
-        # En cas d'erreur, retourner offline
+    else:
+        # Modèle non trouvé dans le cache
         return {
             "username": username,
             "isOnline": False,
@@ -524,44 +507,15 @@ async def get_model_status(username: str):
 
 @app.get("/api/thumbnail/{username}")
 async def get_thumbnail(username: str):
-    """Génère miniature depuis le flux HLS si disponible, sinon fallback Chaturbate"""
-    import requests
+    """Sert la miniature depuis le cache (générée par la tâche de monitoring)"""
     from fastapi.responses import FileResponse, Response
-    import subprocess
-    import time
     
-    # Dossier pour les miniatures live
-    live_thumbs_dir = OUTPUT_DIR / "thumbnails" / "live"
-    live_thumbs_dir.mkdir(parents=True, exist_ok=True)
-    thumb_path = live_thumbs_dir / f"{username}.jpg"
+    # Récupérer le chemin de la miniature depuis SQLite
+    model = await db.get_model(username)
     
-    # Vérifier si une session HLS est active pour ce username
-    active_sessions = manager.list_status()
-    session = next((s for s in active_sessions if s.get('person') == username and s.get('running')), None)
-    
-    # Si session active et miniature n'existe pas ou ancienne (>5min), générer depuis le stream
-    if session:
-        needs_update = not thumb_path.exists() or (time.time() - thumb_path.stat().st_mtime > 300)
+    if model and model.get('thumbnail_path'):
+        thumb_path = Path(model['thumbnail_path'])
         
-        if needs_update:
-            # Trouver le fichier M3U8 de la session
-            session_dir = OUTPUT_DIR / "sessions" / session['id']
-            m3u8_file = session_dir / "stream.m3u8"
-            
-            if m3u8_file.exists():
-                try:
-                    # Capturer une frame depuis le stream HLS
-                    subprocess.run([
-                        FFMPEG_PATH, "-i", str(m3u8_file),
-                        "-vframes", "1",
-                        "-vf", "scale=280:-1",
-                        "-y",
-                        str(thumb_path)
-                    ], capture_output=True, timeout=5, check=False)
-                except:
-                    pass
-        
-        # Retourner la miniature générée si elle existe
         if thumb_path.exists():
             return FileResponse(
                 path=str(thumb_path),
@@ -569,88 +523,18 @@ async def get_thumbnail(username: str):
                 headers={"Cache-Control": "public, max-age=60"}
             )
     
-    # Si offline: générer depuis la dernière rediffusion
-    offline_thumbs_dir = OUTPUT_DIR / "thumbnails" / "offline"
-    offline_thumbs_dir.mkdir(parents=True, exist_ok=True)
-    offline_thumb_path = offline_thumbs_dir / f"{username}.jpg"
-    
-    # Chercher la dernière rediffusion
-    records_dir = OUTPUT_DIR / "records" / username
-    if records_dir.exists():
-        ts_files = sorted(records_dir.glob("*.ts"), reverse=True)
-        
-        if ts_files and (not offline_thumb_path.exists() or (time.time() - offline_thumb_path.stat().st_mtime > 86400)):
-            # Prendre la dernière rediffusion
-            latest_recording = ts_files[0]
-            
-            try:
-                # Extraire durée de la vidéo
-                duration_result = subprocess.run([
-                    FFMPEG_PATH, "-i", str(latest_recording),
-                    "-f", "null", "-"
-                ], capture_output=True, text=True, timeout=5)
-                
-                # Parser la durée depuis stderr
-                duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', duration_result.stderr)
-                if duration_match:
-                    hours = int(duration_match.group(1))
-                    minutes = int(duration_match.group(2))
-                    seconds = int(duration_match.group(3))
-                    total_seconds = hours * 3600 + minutes * 60 + seconds
-                    
-                    # Prendre une frame au milieu de la vidéo
-                    middle_timestamp = total_seconds // 2
-                    
-                    # Extraire la frame
-                    subprocess.run([
-                        FFMPEG_PATH, "-ss", str(middle_timestamp),
-                        "-i", str(latest_recording),
-                        "-vframes", "1",
-                        "-vf", "scale=280:-1",
-                        "-y",
-                        str(offline_thumb_path)
-                    ], capture_output=True, timeout=10, check=False)
-            except Exception as e:
-                logger.warning("Erreur extraction thumbnail offline", 
-                             username=username, 
-                             error=str(e))
-        
-        # Retourner la miniature offline si elle existe
-        if offline_thumb_path.exists():
+    # Chercher manuellement dans les dossiers si pas en cache
+    # Ordre de préférence: live > chaturbate > offline
+    for subdir in ["live", "chaturbate", "offline"]:
+        thumb_path = OUTPUT_DIR / "thumbnails" / subdir / f"{username}.jpg"
+        if thumb_path.exists():
             return FileResponse(
-                path=str(offline_thumb_path),
+                path=str(thumb_path),
                 media_type="image/jpeg",
-                headers={"Cache-Control": "public, max-age=3600"}
+                headers={"Cache-Control": "public, max-age=60"}
             )
     
-    # Fallback final: essayer Chaturbate
-    try:
-        img_urls = [
-            f"https://roomimg.stream.highwebmedia.com/ri/{username}.jpg",
-            f"https://cbjpeg.stream.highwebmedia.com/stream?room={username}&f=.jpg",
-        ]
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "https://chaturbate.com/",
-        }
-        
-        for img_url in img_urls:
-            try:
-                response = requests.get(img_url, headers=headers, timeout=3, allow_redirects=True)
-                
-                if response.status_code == 200 and len(response.content) > 1000:
-                    return Response(
-                        content=response.content,
-                        media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=60"}
-                    )
-            except:
-                continue
-    except:
-        pass
-    
-    # SVG placeholder si tout échoue
+    # SVG placeholder si aucune miniature trouvée
     svg_placeholder = f'''<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200">
         <defs>
             <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -673,81 +557,38 @@ async def get_thumbnail(username: str):
 @app.get("/api/dashboard")
 async def get_dashboard():
     """
-    Endpoint optimisé qui retourne TOUTES les données nécessaires en une seule requête
-    pour un chargement instantané de la page
+    Endpoint optimisé qui retourne TOUTES les données depuis le cache SQLite
+    Ultra-rapide car tout est pré-calculé par la tâche de monitoring
     """
-    import requests
-    
     try:
-        # 1. Charger la liste des modèles
-        models_file = OUTPUT_DIR / "models.json"
-        if models_file.exists():
-            with open(models_file) as f:
-                models_data = json.load(f)
-                # Support des deux formats: {"models": [...]} ou [...]
-                if isinstance(models_data, dict):
-                    models = models_data.get("models", [])
-                elif isinstance(models_data, list):
-                    models = models_data
-                else:
-                    models = []
-        else:
-            models = []
+        # Récupérer tous les modèles depuis SQLite (déjà avec statut à jour)
+        models = await db.get_all_models()
         
-        # 2. Récupérer les sessions actives
+        # Récupérer les sessions actives
         active_sessions = manager.list_status()
         
-        # 3. Pour chaque modèle, récupérer les infos en parallèle
+        # Formater les données pour le frontend
         models_info = []
         
         for model in models:
-            username = model["username"]
+            username = model['username']
             
-            # Infos du modèle (online, viewers, etc.)
-            model_status = {
+            # Récupérer le nombre d'enregistrements depuis SQLite
+            recordings_count = await db.get_recordings_count(username)
+            
+            model_info = {
                 "username": username,
-                "isOnline": False,
-                "viewers": 0,
+                "isOnline": bool(model.get('is_online', False)),
+                "isRecording": bool(model.get('is_recording', False)),
+                "viewers": model.get('viewers', 0),
                 "thumbnail": f"/api/thumbnail/{username}",
-                "recordingsCount": 0,
-                "isRecording": False
+                "recordingsCount": recordings_count,
+                "recordQuality": model.get('record_quality', 'best'),
+                "retentionDays": model.get('retention_days', 30),
+                "autoRecord": bool(model.get('auto_record', True))
             }
             
-            # Vérifier si en cours d'enregistrement
-            session = next((s for s in active_sessions if s.get('person') == username and s.get('running')), None)
-            if session:
-                model_status["isRecording"] = True
-            
-            # Récupérer le statut online via l'API Chaturbate (rapide)
-            if CB_RESOLVER_ENABLED:
-                try:
-                    api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Accept": "application/json",
-                    }
-                    api_resp = requests.get(api_url, headers=headers, timeout=2)
-                    if api_resp.status_code == 200:
-                        api_data = api_resp.json()
-                        model_status["isOnline"] = api_data.get("room_status") == "public"
-                        model_status["viewers"] = api_data.get("num_users", 0)
-                except:
-                    pass
-            
-            # Compter les rediffusions (rapide)
-            records_dir = OUTPUT_DIR / "records" / username
-            if records_dir.exists():
-                ts_files = list(records_dir.glob("*.ts"))
-                model_status["recordingsCount"] = len(ts_files)
-            
-            # Ajouter les infos du modèle
-            model_status.update({
-                "recordQuality": model.get("recordQuality", "best"),
-                "retentionDays": model.get("retentionDays", 30),
-                "autoRecord": model.get("autoRecord", True)
-            })
-            
-            models_info.append(model_status)
+            models_info.append(model_info)
         
         # Retourner tout d'un coup
         return {
@@ -757,126 +598,56 @@ async def get_dashboard():
         }
     
     except Exception as e:
-        logger.error("Erreur dashboard", error=str(e))
+        logger.error("Erreur dashboard", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/recordings/{username}")
 async def list_recordings(username: str):
-    """Liste les enregistrements disponibles pour un modèle (optimisé avec cache)"""
-    import json
+    """Liste les enregistrements depuis le cache SQLite (ultra-rapide)"""
     from datetime import datetime
     
-    records_dir = OUTPUT_DIR / "records" / username
-    thumbnails_dir = OUTPUT_DIR / "thumbnails" / username
-    cache_file = OUTPUT_DIR / "records" / username / ".metadata_cache.json"
+    # Récupérer depuis SQLite
+    recordings_db = await db.get_recordings(username)
     
-    if not records_dir.exists():
-        return {"recordings": []}
-    
-    # Créer le dossier thumbnails si nécessaire
-    thumbnails_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Charger le cache
-    cache = {}
-    if cache_file.exists():
-        try:
-            with open(cache_file, 'r') as f:
-                cache = json.load(f)
-        except:
-            cache = {}
-    
-    # Trouver tous les fichiers .ts
     recordings = []
-    cache_updated = False
+    thumbnails_dir = OUTPUT_DIR / "thumbnails" / username
     
-    for ts_file in sorted(records_dir.glob("*.ts"), reverse=True):
-        stat = ts_file.stat()
-        filename = ts_file.name
-        file_mtime = stat.st_mtime
+    for rec in recordings_db:
+        filename = rec['filename']
+        file_path = Path(rec['file_path'])
         
-        # Vérifier si les métadonnées sont en cache et à jour
-        if filename in cache and cache[filename].get('mtime') == file_mtime:
-            # Utiliser le cache
-            cached_data = cache[filename]
-            duration_seconds = cached_data.get('duration', 0)
-            duration_str = cached_data.get('duration_str', '0m00s')
-        else:
-            # Calculer la durée (en arrière-plan pour la prochaine fois)
-            duration_seconds = 0
-            try:
-                import subprocess
-                import shutil
-                
-                # Vérifier que ffprobe est disponible
-                if shutil.which("ffprobe"):
-                    result = subprocess.run([
-                        "ffprobe", "-v", "error",
-                        "-show_entries", "format=duration",
-                        "-of", "default=noprint_wrappers=1:nokey=1",
-                        str(ts_file)
-                    ], capture_output=True, text=True, timeout=3)
-                    if result.returncode == 0 and result.stdout.strip():
-                        duration_seconds = int(float(result.stdout.strip()))
-            except Exception as e:
-                logger.warning("Erreur calcul durée fichier", filename=ts_file.name, error=str(e))
-                pass
-            
-            # Formater la durée
-            hours = duration_seconds // 3600
-            minutes = (duration_seconds % 3600) // 60
-            seconds = duration_seconds % 60
-            if hours > 0:
-                duration_str = f"{hours}h{minutes:02d}m"
-            else:
-                duration_str = f"{minutes}m{seconds:02d}s"
-            
-            # Mettre en cache
-            cache[filename] = {
-                'duration': duration_seconds,
-                'duration_str': duration_str,
-                'mtime': file_mtime
-            }
-            cache_updated = True
+        # Vérifier que le fichier existe toujours
+        if not file_path.exists():
+            continue
+        
+        stat = file_path.stat()
         
         # Miniature
-        thumb_path = thumbnails_dir / f"{ts_file.stem}.jpg"
-        thumb_url = f"/api/recording-thumbnail/{username}/{ts_file.stem}.jpg"
+        thumb_path = thumbnails_dir / f"{file_path.stem}.jpg"
+        thumb_url = f"/api/recording-thumbnail/{username}/{file_path.stem}.jpg"
         
-        # Générer miniature en arrière-plan si elle n'existe pas
-        if not thumb_path.exists() and stat.st_size > 1024 * 1024:
-            import subprocess
-            try:
-                subprocess.Popen([
-                    FFMPEG_PATH, "-i", str(ts_file),
-                    "-ss", "00:00:10",
-                    "-vframes", "1",
-                    "-vf", "scale=320:-1",
-                    "-y",
-                    str(thumb_path)
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except:
-                pass
+        # Formater la durée
+        duration_seconds = rec.get('duration_seconds', 0)
+        hours = duration_seconds // 3600
+        minutes = (duration_seconds % 3600) // 60
+        seconds = duration_seconds % 60
+        if hours > 0:
+            duration_str = f"{hours}h{minutes:02d}m"
+        else:
+            duration_str = f"{minutes}m{seconds:02d}s"
         
         recordings.append({
             "filename": filename,
-            "date": ts_file.stem,
-            "size": stat.st_size,
-            "size_mb": round(stat.st_size / 1024 / 1024, 2),
+            "date": file_path.stem,
+            "size": rec['file_size'],
+            "size_mb": round(rec['file_size'] / 1024 / 1024, 2),
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "url": f"/streams/records/{username}/{filename}",
             "thumbnail": thumb_url if thumb_path.exists() else None,
             "duration": duration_seconds,
             "duration_str": duration_str
         })
-    
-    # Sauvegarder le cache si mis à jour
-    if cache_updated:
-        try:
-            with open(cache_file, 'w') as f:
-                json.dump(cache, f)
-        except:
-            pass
     
     return {"recordings": recordings}
 
@@ -910,75 +681,105 @@ async def get_recording_thumbnail(username: str, filename: str):
 
 @app.get("/api/models")
 async def get_models():
-    """Récupère la liste des modèles sauvegardés"""
-    models = load_models()
-    return {"models": models}
+    """Récupère la liste des modèles depuis SQLite"""
+    models = await db.get_all_models()
+    
+    # Formater pour compatibilité avec le frontend
+    formatted_models = []
+    for model in models:
+        formatted_models.append({
+            "username": model['username'],
+            "autoRecord": bool(model.get('auto_record', True)),
+            "recordQuality": model.get('record_quality', 'best'),
+            "retentionDays": model.get('retention_days', 30)
+        })
+    
+    return {"models": formatted_models}
 
 
 @app.post("/api/models")
 async def add_model(model: dict):
-    """Ajoute un modèle à la liste"""
-    models = load_models()
-    
-    # Vérifier si le modèle existe déjà
+    """Ajoute un modèle dans SQLite"""
     username = model.get('username')
     if not username:
         raise HTTPException(status_code=400, detail="Username requis")
     
-    # Éviter les doublons
-    if any(m.get('username') == username for m in models):
+    # Vérifier si le modèle existe déjà
+    existing = await db.get_model(username)
+    if existing:
         raise HTTPException(status_code=409, detail="Modèle déjà existant")
     
-    models.append(model)
+    # Ajouter dans SQLite
+    await db.add_or_update_model(
+        username=username,
+        auto_record=model.get('autoRecord', True),
+        record_quality=model.get('recordQuality', 'best'),
+        retention_days=model.get('retentionDays', 30)
+    )
     
-    if save_models_to_file(models):
-        return {"success": True, "models": models}
-    else:
-        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
+    # Récupérer tous les modèles pour retourner
+    all_models = await db.get_all_models()
+    formatted = [{
+        "username": m['username'],
+        "autoRecord": bool(m.get('auto_record', True)),
+        "recordQuality": m.get('record_quality', 'best'),
+        "retentionDays": m.get('retention_days', 30)
+    } for m in all_models]
+    
+    return {"success": True, "models": formatted}
 
 
 @app.put("/api/models/{username}")
 async def update_model(username: str, model_data: dict):
-    """Met à jour les paramètres d'un modèle"""
-    models = load_models()
-    
-    # Trouver le modèle
-    model_index = -1
-    for i, m in enumerate(models):
-        if m.get('username') == username:
-            model_index = i
-            break
-    
-    if model_index == -1:
+    """Met à jour les paramètres d'un modèle dans SQLite"""
+    # Vérifier si le modèle existe
+    existing = await db.get_model(username)
+    if not existing:
         raise HTTPException(status_code=404, detail="Modèle introuvable")
     
-    # Mettre à jour les paramètres (garder username et addedAt)
-    if 'recordQuality' in model_data:
-        models[model_index]['recordQuality'] = model_data['recordQuality']
-    if 'retentionDays' in model_data:
-        models[model_index]['retentionDays'] = model_data['retentionDays']
-    if 'autoRecord' in model_data:
-        models[model_index]['autoRecord'] = model_data['autoRecord']
+    # Mettre à jour dans SQLite
+    await db.add_or_update_model(
+        username=username,
+        auto_record=model_data.get('autoRecord', existing.get('auto_record', True)),
+        record_quality=model_data.get('recordQuality', existing.get('record_quality', 'best')),
+        retention_days=model_data.get('retentionDays', existing.get('retention_days', 30))
+    )
     
-    if save_models_to_file(models):
-        return {"success": True, "model": models[model_index]}
-    else:
-        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
+    # Récupérer le modèle mis à jour
+    updated = await db.get_model(username)
+    
+    return {
+        "success": True,
+        "model": {
+            "username": updated['username'],
+            "autoRecord": bool(updated.get('auto_record', True)),
+            "recordQuality": updated.get('record_quality', 'best'),
+            "retentionDays": updated.get('retention_days', 30)
+        }
+    }
 
 
 @app.delete("/api/models/{username}")
 async def delete_model(username: str):
-    """Supprime un modèle de la liste"""
-    models = load_models()
-    filtered = [m for m in models if m.get('username') != username]
-    
-    if len(filtered) == len(models):
+    """Supprime un modèle de SQLite"""
+    # Vérifier si le modèle existe
+    existing = await db.get_model(username)
+    if not existing:
         raise HTTPException(status_code=404, detail="Modèle introuvable")
     
-    if save_models_to_file(filtered):
-        return {"success": True, "models": filtered}
-    else:
-        raise HTTPException(status_code=500, detail="Erreur de sauvegarde")
+    # Supprimer de SQLite
+    await db.delete_model(username)
+    
+    # Récupérer la liste mise à jour
+    all_models = await db.get_all_models()
+    formatted = [{
+        "username": m['username'],
+        "autoRecord": bool(m.get('auto_record', True)),
+        "recordQuality": m.get('record_quality', 'best'),
+        "retentionDays": m.get('retention_days', 30)
+    } for m in all_models]
+    
+    return {"success": True, "models": formatted}
 
 
 @app.delete("/api/recordings/{username}/{filename}")
@@ -1026,13 +827,13 @@ async def delete_recording(username: str, filename: str):
 # ============================================
 
 async def auto_record_task():
-    """Vérifie automatiquement les modèles et lance les enregistrements"""
+    """Vérifie automatiquement les modèles et lance les enregistrements (utilise SQLite)"""
     while True:
         try:
             await asyncio.sleep(120)  # Vérifier toutes les 2 minutes
             
-            # Charger les modèles
-            models = load_models()
+            # Charger les modèles depuis SQLite avec auto_record activé
+            models = await db.get_models_for_auto_record()
             if not models:
                 continue
             
@@ -1041,14 +842,9 @@ async def auto_record_task():
             
             for model in models:
                 username = model.get('username')
-                auto_record = model.get('autoRecord', True)  # Par défaut activé
                 
                 if not username:
                     continue
-                
-                # Vérifier si l'enregistrement auto est activé
-                if not auto_record:
-                    continue  # Auto-enregistrement désactivé pour ce modèle
                 
                 # Vérifier si déjà en enregistrement
                 is_recording = any(
@@ -1059,50 +855,52 @@ async def auto_record_task():
                 if is_recording:
                     continue  # Déjà en cours
                 
-                # Vérifier si le modèle est en ligne
-                try:
-                    # Utiliser l'API Chaturbate
-                    api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Referer": "https://chaturbate.com/",
-                    }
-                    
-                    resp = requests.get(api_url, headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        hls_source = data.get('hls_source')
+                # Vérifier le statut depuis le cache SQLite (mis à jour par monitor)
+                cached_status = await db.get_model(username)
+                
+                if cached_status and cached_status.get('is_online'):
+                    # Modèle en ligne selon le cache, vérifier le flux HLS
+                    try:
+                        api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+                        headers = {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://chaturbate.com/",
+                        }
                         
-                        if hls_source:
-                            # Modèle en ligne avec flux HLS disponible
-                            logger.background_task("auto-record", f"Modèle en ligne: {username}")
+                        resp = requests.get(api_url, headers=headers, timeout=10)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            hls_source = data.get('hls_source')
                             
-                            # Lancer l'enregistrement
-                            try:
-                                sess = manager.start_session(
-                                    input_url=hls_source,
-                                    display_name=username,
-                                    person=username
-                                )
+                            if hls_source:
+                                # Lancer l'enregistrement
+                                logger.background_task("auto-record", f"Modèle en ligne: {username}")
                                 
-                                if sess:
-                                    logger.success("Auto-enregistrement démarré", 
+                                try:
+                                    sess = manager.start_session(
+                                        input_url=hls_source,
+                                        display_name=username,
+                                        person=username
+                                    )
+                                    
+                                    if sess:
+                                        logger.success("Auto-enregistrement démarré", 
+                                                     task="auto-record",
+                                                     username=username,
+                                                     session_id=sess.id)
+                                except RuntimeError as e:
+                                    logger.warning("Impossible démarrer enregistrement",
                                                  task="auto-record",
                                                  username=username,
-                                                 session_id=sess.id)
-                            except RuntimeError as e:
-                                logger.warning("Impossible démarrer enregistrement",
-                                             task="auto-record",
-                                             username=username,
-                                             error=str(e))
-                                continue
-                            
-                except Exception as e:
-                    logger.error("Erreur vérification modèle",
-                               task="auto-record",
-                               username=username,
-                               error=str(e))
-                    continue
+                                                 error=str(e))
+                                    continue
+                                
+                    except Exception as e:
+                        logger.error("Erreur vérification modèle",
+                                   task="auto-record",
+                                   username=username,
+                                   error=str(e))
+                        continue
                 
         except Exception as e:
             logger.error("Erreur auto-record task", task="auto-record", exc_info=True, error=str(e))
@@ -1119,12 +917,12 @@ async def cleanup_old_recordings_task():
             
             logger.background_task("cleanup", "Début nettoyage anciennes rediffusions")
             
-            # Charger les modèles avec leurs paramètres de rétention
-            models = load_models()
+            # Charger les modèles depuis SQLite avec leurs paramètres de rétention
+            models = await db.get_all_models()
             
             for model in models:
                 username = model.get('username')
-                retention_days = model.get('retentionDays', 30)  # Défaut 30 jours
+                retention_days = model.get('retention_days', 30)  # Défaut 30 jours
                 
                 if not username:
                     continue
@@ -1190,6 +988,14 @@ async def cleanup_old_recordings_task():
 @app.on_event("startup")
 async def startup_event():
     """Démarre les background tasks au démarrage de l'application"""
+    # Initialiser la base de données
+    await db.initialize()
+    
+    # Migrer les données depuis le JSON si nécessaire
+    await db.migrate_from_json(MODELS_FILE)
+    
+    # Démarrer les tâches de fond
+    asyncio.create_task(monitor_models_task(db, manager, FFMPEG_PATH))
     asyncio.create_task(auto_record_task())
     asyncio.create_task(cleanup_old_recordings_task())
-    logger.info("🚀 Background tasks démarrés", tasks=["auto-record", "cleanup"])
+    logger.info("🚀 Background tasks démarrés", tasks=["monitor", "auto-record", "cleanup"])
