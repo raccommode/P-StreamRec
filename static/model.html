@@ -614,6 +614,25 @@
       
       <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);" />
       
+      <!-- Contrôles d'enregistrement manuel -->
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="margin-bottom: 1rem;">
+          <strong style="color: var(--text-primary);">Contrôles manuels</strong>
+          <div style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+            Démarrer ou arrêter l'enregistrement manuellement
+          </div>
+        </div>
+        <button 
+          type="button" 
+          id="manualRecordBtn" 
+          onclick="toggleRecording()" 
+          style="padding: 0.75rem 1.5rem; border: 1px solid var(--accent); border-radius: 8px; background: rgba(99, 102, 241, 0.1); color: var(--accent); cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s;">
+          ⏺ Démarrer l'enregistrement
+        </button>
+      </div>
+      
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);" />
+      
       <div style="text-align: center;">
         <button type="button" onclick="deleteModelFromSettings()" style="padding: 0.75rem 1.5rem; border: 1px solid var(--danger); border-radius: 8px; background: transparent; color: var(--danger); cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s;">
           🗑️ Supprimer ce modèle
@@ -660,8 +679,6 @@
           
           document.getElementById('statusDot').className = 'status-dot recording';
           document.getElementById('statusText').textContent = 'En enregistrement';
-          document.getElementById('recordBtn').innerHTML = '⏹️ Arrêter l\'enregistrement';
-          document.getElementById('recordBtn').className = 'action-btn btn-stop';
           
           // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
           if (!wasRecording) {
@@ -674,14 +691,10 @@
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot online';
           document.getElementById('statusText').textContent = 'En ligne';
-          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
-          document.getElementById('recordBtn').className = 'action-btn btn-record';
         } else {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot offline';
           document.getElementById('statusText').textContent = 'Hors ligne';
-          document.getElementById('recordBtn').innerHTML = '⏺ Démarrer l\'enregistrement';
-          document.getElementById('recordBtn').className = 'action-btn btn-record';
         }
       } catch (e) {
         console.error('Erreur statut:', e);
@@ -696,7 +709,8 @@
           const res = await fetch(`/api/stop/${currentSession.id}`, { method: 'POST' });
           if (res.ok) {
             showNotification('Enregistrement arrêté');
-            updateModelStatus();
+            await updateModelStatus();
+            updateManualRecordButton();
           }
         } catch (e) {
           showNotification('Erreur lors de l\'arrêt', 'error');
@@ -718,11 +732,13 @@
           if (res.ok) {
             const data = await res.json();
             showNotification('Enregistrement démarré!');
-            updateModelStatus();
+            await updateModelStatus();
+            updateManualRecordButton();
           } else if (res.status === 409) {
             // Session déjà en cours, charger le stream quand même
             console.log('⏭️ Session déjà en cours, chargement du stream...');
             await updateModelStatus();
+            updateManualRecordButton();
           } else {
             const error = await res.json();
             showNotification(error.detail || 'Erreur', 'error');
@@ -1142,8 +1158,29 @@
         console.error('Erreur chargement paramètres:', e);
       }
       
+      // Mettre à jour le bouton d'enregistrement manuel
+      updateManualRecordButton();
+      
       // Afficher le modal
       document.getElementById('settingsModal').style.display = 'flex';
+    }
+    
+    // Mettre à jour le bouton d'enregistrement manuel
+    function updateManualRecordButton() {
+      const btn = document.getElementById('manualRecordBtn');
+      if (!btn) return;
+      
+      if (currentSession && currentSession.running) {
+        btn.innerHTML = '⏹️ Arrêter l\'enregistrement';
+        btn.style.borderColor = 'var(--danger)';
+        btn.style.color = 'var(--danger)';
+        btn.style.background = 'rgba(239, 68, 68, 0.1)';
+      } else {
+        btn.innerHTML = '⏺ Démarrer l\'enregistrement';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        btn.style.background = 'rgba(99, 102, 241, 0.1)';
+      }
     }
     
     function closeSettingsModal() {
