@@ -253,7 +253,7 @@ async def monitor_models_task(
                         
                         # Générer/mettre à jour la miniature
                         thumbnail_path = None
-                        last_thumbnail_update = model.get('thumbnail_updated_at', 0)
+                        last_thumbnail_update = model.get('thumbnail_updated_at') or 0
                         needs_thumbnail_update = (
                             datetime.now().timestamp() - last_thumbnail_update > THUMBNAIL_UPDATE_INTERVAL
                         )
