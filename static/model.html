@@ -669,14 +669,19 @@
     // FONCTIONS GLOBALES (appelées depuis HTML)
     // ============================================
     
+    // Variables pour stocker les fonctions internes
+    let loadRecordingsFunc = null;
+    let getWatchProgressFunc = null;
+    let saveWatchProgressFunc = null;
+    
     // Switch entre onglets
     window.switchTab = function(tabName) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
-      if (tabName === 'recordings') {
-        loadRecordings();
+      if (tabName === 'recordings' && loadRecordingsFunc) {
+        loadRecordingsFunc();
       }
     };
     
@@ -745,10 +750,36 @@
     // Lire recording
     window.playRecording = function(url, filename) {
       currentRecordingFile = filename;
-      const video = document.getElementById('video');
+      const video = document.getElementById('player');
+      
+      // Arrêter HLS player si actif
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+      
+      // Charger la vidéo
       video.src = url;
-      video.play();
-      loadWatchProgress(filename);
+      
+      // Charger la progression si disponible
+      if (getWatchProgressFunc) {
+        const progress = getWatchProgressFunc(filename);
+        if (progress && progress.position > 10) {
+          video.addEventListener('loadedmetadata', () => {
+            video.currentTime = progress.position;
+            showNotification(`Resume at ${Math.floor(progress.position / 60)}:${Math.floor(progress.position % 60).toString().padStart(2, '0')}`, 'info');
+          }, { once: true });
+        }
+      }
+      
+      // Lancer la lecture
+      video.play().catch(e => {
+        console.error('Play error:', e);
+        showNotification('Click ▶️ to play', 'info');
+      });
+      
+      // Retourner à l'onglet Live pour voir le lecteur
+      window.switchTab('live');
     };
     
     // Supprimer recording
@@ -1061,6 +1092,9 @@
       const list = document.getElementById('recordingsList');
       const count = document.getElementById('recordingsCount');
       
+      // Rendre accessible globalement
+      loadRecordingsFunc = loadRecordings;
+      
       try {
         const res = await fetch(`/api/recordings/${username}`);
         const data = await res.json();
@@ -1155,6 +1189,7 @@
       const key = `watch_progress_${username}_${filename}`;
       localStorage.setItem(key, JSON.stringify({ position, duration, timestamp: Date.now() }));
     }
+    saveWatchProgressFunc = saveWatchProgress; // Rendre accessible
     
     // Récupérer la progression de lecture
     function getWatchProgress(filename) {
@@ -1162,6 +1197,7 @@
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     }
+    getWatchProgressFunc = getWatchProgress; // Rendre accessible
     
     // Variable pour suivre l'enregistrement en cours
     let currentRecordingFile = null;
