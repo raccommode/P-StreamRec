@@ -147,7 +147,20 @@ async function updateModelsStatus() {
     
     // Charger TOUTES les infos en PARALLÈLE (beaucoup plus rapide)
     const modelsInfo = await Promise.all(
-      models.map(model => getModelInfo(model.username))
+      models.map(async (model) => {
+        const [info, recordingsRes] = await Promise.all([
+          getModelInfo(model.username),
+          fetch(`/api/recordings/${model.username}`).catch(() => null)
+        ]);
+        
+        let recordingsCount = 0;
+        if (recordingsRes && recordingsRes.ok) {
+          const recData = await recordingsRes.json();
+          recordingsCount = recData.recordings?.length || 0;
+        }
+        
+        return { ...info, recordingsCount };
+      })
     );
     
     for (let i = 0; i < models.length; i++) {
@@ -177,6 +190,15 @@ async function updateModelsStatus() {
         badge.className = 'badge live';
         badge.textContent = 'LIVE';
         card.insertBefore(badge, card.firstChild);
+      }
+      
+      // Ajouter pastille nombre de rediffusions
+      if (modelInfo.recordingsCount > 0) {
+        const recBadge = document.createElement('div');
+        recBadge.className = 'badge recordings-count';
+        recBadge.textContent = `📁 ${modelInfo.recordingsCount}`;
+        recBadge.style.top = isRecording || modelInfo.isOnline ? '3rem' : '0.75rem';
+        card.insertBefore(recBadge, card.firstChild);
       }
       
       // Mettre à jour le texte de statut

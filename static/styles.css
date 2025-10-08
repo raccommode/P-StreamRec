@@ -175,6 +175,12 @@ body {
   animation: blink 1s infinite;
 }
 
+.badge.recordings-count {
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  right: 0.75rem;
+}
+
 @keyframes blink {
   0%, 50%, 100% { opacity: 1; }
   25%, 75% { opacity: 0.5; }
