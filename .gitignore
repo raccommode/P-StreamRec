@@ -3,3 +3,8 @@ __pycache__/
 .venv/
 .env
 /data/
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
