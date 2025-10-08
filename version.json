@@ -1,14 +1,16 @@
 {
-  "version": "2025.40.B",
-  "releaseDate": "2025-10-05",
+  "version": "2.0.0",
+  "releaseDate": "2025-10-08",
   "changelog": [
-    "GitOps: Mises à jour one-click depuis l'interface",
-    "Auto-enregistrement configurable par modèle",
-    "Interface simplifiée avec paramètres centralisés",
-    "Qualité d'enregistrement configurable",
-    "Rétention automatique des rediffusions",
-    "Version automatiquement synchronisée",
-    "Cache métadonnées rediffusions (30x plus rapide)",
-    "Système de version ANNÉE.SEMAINE.LETTRE"
+    "Complete logging system with colors and timestamps",
+    "GitOps: One-click updates from web interface",
+    "High quality M3U8 resolution (API priority)",
+    "Dynamic status updates without page reload",
+    "Per-model auto-record configuration",
+    "Configurable recording quality and retention",
+    "Centralized settings interface",
+    "Live stream viewer with quality selector",
+    "Automatic cleanup of old recordings",
+    "Professional modular code structure"
   ]
 }
