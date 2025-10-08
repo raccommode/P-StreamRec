@@ -670,6 +670,91 @@ async def get_thumbnail(username: str):
     )
 
 
+@app.get("/api/dashboard")
+async def get_dashboard():
+    """
+    Endpoint optimisé qui retourne TOUTES les données nécessaires en une seule requête
+    pour un chargement instantané de la page
+    """
+    import requests
+    
+    try:
+        # 1. Charger la liste des modèles
+        models_file = OUTPUT_DIR / "models.json"
+        if models_file.exists():
+            with open(models_file) as f:
+                models_data = json.load(f)
+                models = models_data.get("models", [])
+        else:
+            models = []
+        
+        # 2. Récupérer les sessions actives
+        active_sessions = manager.list_status()
+        
+        # 3. Pour chaque modèle, récupérer les infos en parallèle
+        models_info = []
+        
+        for model in models:
+            username = model["username"]
+            
+            # Infos du modèle (online, viewers, etc.)
+            model_status = {
+                "username": username,
+                "isOnline": False,
+                "viewers": 0,
+                "thumbnail": f"/api/thumbnail/{username}",
+                "recordingsCount": 0,
+                "isRecording": False
+            }
+            
+            # Vérifier si en cours d'enregistrement
+            session = next((s for s in active_sessions if s.get('person') == username and s.get('running')), None)
+            if session:
+                model_status["isRecording"] = True
+            
+            # Récupérer le statut online via l'API Chaturbate (rapide)
+            if CB_RESOLVER_ENABLED:
+                try:
+                    api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json",
+                    }
+                    api_resp = requests.get(api_url, headers=headers, timeout=2)
+                    if api_resp.status_code == 200:
+                        api_data = api_resp.json()
+                        model_status["isOnline"] = api_data.get("room_status") == "public"
+                        model_status["viewers"] = api_data.get("num_users", 0)
+                except:
+                    pass
+            
+            # Compter les rediffusions (rapide)
+            records_dir = OUTPUT_DIR / "records" / username
+            if records_dir.exists():
+                ts_files = list(records_dir.glob("*.ts"))
+                model_status["recordingsCount"] = len(ts_files)
+            
+            # Ajouter les infos du modèle
+            model_status.update({
+                "recordQuality": model.get("recordQuality", "best"),
+                "retentionDays": model.get("retentionDays", 30),
+                "autoRecord": model.get("autoRecord", True)
+            })
+            
+            models_info.append(model_status)
+        
+        # Retourner tout d'un coup
+        return {
+            "models": models_info,
+            "sessions": active_sessions,
+            "timestamp": int(time.time() * 1000)
+        }
+    
+    except Exception as e:
+        logger.error("Erreur dashboard", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/recordings/{username}")
 async def list_recordings(username: str):
     """Liste les enregistrements disponibles pour un modèle (optimisé avec cache)"""

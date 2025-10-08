@@ -199,41 +199,53 @@ async function getModelInfo(username, useCache = true) {
 // Afficher les modèles
 // ============================================
 
+// Charger TOUTES les données d'un coup depuis le backend optimisé
+async function getDashboardData() {
+  try {
+    const res = await fetch('/api/dashboard');
+    if (res.ok) {
+      const data = await res.json();
+      // Sauvegarder en cache
+      localStorage.setItem('dashboard_cache', JSON.stringify({
+        ...data,
+        cachedAt: Date.now()
+      }));
+      return data;
+    }
+  } catch (e) {
+    console.error('Error loading dashboard:', e);
+  }
+  
+  // Fallback sur le cache
+  const cached = localStorage.getItem('dashboard_cache');
+  if (cached) {
+    const data = JSON.parse(cached);
+    // Cache valide pendant 1 minute
+    if (Date.now() - data.cachedAt < 60000) {
+      return data;
+    }
+  }
+  
+  return { models: [], sessions: [] };
+}
+
 // Mise à jour dynamique des statuts sans recréer les cartes
 async function updateModelsStatus() {
   try {
-    const sessions = await getActiveSessions();
-    const models = await getModels();
+    // UNE SEULE requête pour tout !
+    const dashboardData = await getDashboardData();
+    const models = dashboardData.models || [];
+    const sessions = dashboardData.sessions || [];
+    
     const liveGrid = document.getElementById('liveGrid');
     const liveSection = document.getElementById('liveSection');
     let liveCount = 0;
     
-    // Charger TOUTES les infos en PARALLÈLE (beaucoup plus rapide)
-    const modelsInfo = await Promise.all(
-      models.map(async (model) => {
-        const [info, recordingsRes] = await Promise.all([
-          getModelInfo(model.username),
-          fetch(`/api/recordings/${model.username}`).catch(() => null)
-        ]);
-        
-        let recordingsCount = 0;
-        if (recordingsRes && recordingsRes.ok) {
-          const recData = await recordingsRes.json();
-          recordingsCount = recData.recordings?.length || 0;
-        }
-        
-        return { ...info, recordingsCount };
-      })
-    );
-    
-    for (let i = 0; i < models.length; i++) {
-      const model = models[i];
-      const modelInfo = modelsInfo[i];
-      
-      const card = document.querySelector(`.model-card[data-username="${model.username}"]`);
+    for (const modelInfo of models) {
+      const card = document.querySelector(`.model-card[data-username="${modelInfo.username}"]`);
       if (!card) continue; // Carte pas encore créée
       
-      const isRecording = sessions.some(s => s.person === model.username && s.running);
+      const isRecording = modelInfo.isRecording;
       const isLive = isRecording || modelInfo.isOnline;
       
       // Mettre à jour le statut de la carte
@@ -316,12 +328,21 @@ async function updateModelsStatus() {
 }
 
 async function renderModels() {
-  // Essayer d'afficher le cache immédiatement pour l'illusion d'instantanéité
-  const cachedModels = getModelsCache();
-  let models = cachedModels || [];
-  
   const grid = document.getElementById('modelsGrid');
   const emptyState = document.getElementById('emptyState');
+  
+  // Essayer le cache dashboard pour affichage instantané
+  const cached = localStorage.getItem('dashboard_cache');
+  let models = [];
+  
+  if (cached) {
+    try {
+      const data = JSON.parse(cached);
+      if (Date.now() - data.cachedAt < 60000) {
+        models = data.models || [];
+      }
+    } catch (e) {}
+  }
   
   // Afficher immédiatement le cache si disponible
   if (models.length > 0) {
@@ -343,28 +364,26 @@ async function renderModels() {
     offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
     grid.appendChild(offlineSection);
     
-    // Créer les cartes IMMÉDIATEMENT
-    for (const model of models) {
+    // Créer les cartes IMMÉDIATEMENT avec les données du cache
+    for (const modelInfo of models) {
       const card = document.createElement('div');
       card.className = 'model-card offline';
-      card.setAttribute('data-username', model.username);
-      card.onclick = () => openModelPage(model.username);
+      card.setAttribute('data-username', modelInfo.username);
+      card.onclick = () => openModelPage(modelInfo.username);
       
-      // Utiliser les infos en cache si disponibles
-      const cachedInfo = getModelInfoCache(model.username);
-      const statusText = cachedInfo?.isOnline ? 'Live' : 'Offline';
-      const statusClass = cachedInfo?.isOnline ? 'online' : 'offline';
+      const statusText = modelInfo.isOnline ? 'Live' : 'Offline';
+      const statusClass = modelInfo.isOnline ? 'online' : 'offline';
       
       card.innerHTML = `
         <img 
-          src="/api/thumbnail/${model.username}" 
-          alt="${model.username}"
+          src="/api/thumbnail/${modelInfo.username}" 
+          alt="${modelInfo.username}"
           class="model-thumbnail"
-          style="filter: ${cachedInfo?.isOnline ? 'none' : 'grayscale(100%) brightness(0.7)'};"
-          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
+          style="filter: ${modelInfo.isOnline ? 'none' : 'grayscale(100%) brightness(0.7)'};"
+          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${modelInfo.username}%3C/text%3E%3C/svg%3E'"
         />
         <div class="model-info">
-          <div class="model-name">${model.username}</div>
+          <div class="model-name">${modelInfo.username}</div>
           <div class="model-status">
             <span class="status-dot ${statusClass}"></span>
             ${statusText}
@@ -377,7 +396,8 @@ async function renderModels() {
   }
   
   // Charger les vraies données en arrière-plan
-  const freshModels = await getModels();
+  const dashboardData = await getDashboardData();
+  const freshModels = dashboardData.models || [];
   
   if (freshModels.length === 0) {
     grid.innerHTML = '';
@@ -386,7 +406,7 @@ async function renderModels() {
   }
   
   // Si pas de cache, afficher maintenant
-  if (!cachedModels || cachedModels.length === 0) {
+  if (models.length === 0) {
     emptyState.style.display = 'none';
     grid.innerHTML = '';
     
@@ -403,24 +423,28 @@ async function renderModels() {
     offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
     grid.appendChild(offlineSection);
     
-    for (const model of freshModels) {
+    for (const modelInfo of freshModels) {
       const card = document.createElement('div');
       card.className = 'model-card offline';
-      card.setAttribute('data-username', model.username);
-      card.onclick = () => openModelPage(model.username);
+      card.setAttribute('data-username', modelInfo.username);
+      card.onclick = () => openModelPage(modelInfo.username);
+      
+      const statusText = modelInfo.isOnline ? 'Live' : 'Offline';
+      const statusClass = modelInfo.isOnline ? 'online' : 'offline';
       
       card.innerHTML = `
         <img 
-          src="/api/thumbnail/${model.username}" 
-          alt="${model.username}"
+          src="/api/thumbnail/${modelInfo.username}" 
+          alt="${modelInfo.username}"
           class="model-thumbnail"
-          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
+          style="filter: ${modelInfo.isOnline ? 'none' : 'grayscale(100%) brightness(0.7)'};"
+          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${modelInfo.username}%3C/text%3E%3C/svg%3E'"
         />
         <div class="model-info">
-          <div class="model-name">${model.username}</div>
+          <div class="model-name">${modelInfo.username}</div>
           <div class="model-status">
-            <span class="status-dot offline"></span>
-            Loading...
+            <span class="status-dot ${statusClass}"></span>
+            ${statusText}
           </div>
         </div>
       `;
@@ -429,7 +453,7 @@ async function renderModels() {
     }
   }
   
-  // Mettre à jour avec les vraies données
+  // Mettre à jour avec les vraies données (juste les badges et positions)
   updateModelsStatus();
 }
 
