@@ -13,7 +13,7 @@ _min_delay_between_requests = 2.0  # 2 secondes entre chaque requête
 def resolve_m3u8(username: str) -> str:
     """
     Résolveur Chaturbate ultra-simplifié et fiable.
-    Extrait directement le M3U8 depuis la page HTML.
+    Utilise l'API puis fallback sur HTML si nécessaire.
     """
     logger.subsection(f"🔍 Résolution M3U8 - {username}")
     
@@ -25,9 +25,40 @@ def resolve_m3u8(username: str) -> str:
     logger.debug("Username validé", username=username)
     
     try:
-        # Récupérer la page HTML
+        # MÉTHODE 1: Essayer l'API Chaturbate d'abord (meilleure qualité)
+        api_url = f"https://chaturbate.com/api/chatvideocontext/{username}/"
+        logger.progress("Tentative via API Chaturbate", username=username, url=api_url)
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://chaturbate.com/",
+        }
+        
+        api_resp = requests.get(api_url, headers=headers, timeout=10)
+        if api_resp.status_code == 200:
+            api_data = api_resp.json()
+            
+            # Chercher la meilleure qualité disponible
+            # Priorité: hls_source_high > hls_source > fallback HTML
+            best_m3u8 = None
+            
+            if api_data.get('hls_source_high'):
+                best_m3u8 = api_data['hls_source_high']
+                logger.success("M3U8 HAUTE qualité trouvé via API", username=username, source="hls_source_high")
+            elif api_data.get('hls_source'):
+                best_m3u8 = api_data['hls_source']
+                logger.success("M3U8 qualité standard trouvé via API", username=username, source="hls_source")
+            
+            if best_m3u8:
+                logger.success("M3U8 résolu via API", username=username, m3u8_url=best_m3u8[:80])
+                return best_m3u8
+            
+            logger.debug("Pas de HLS dans API, fallback sur HTML", username=username)
+        
+        # MÉTHODE 2: Fallback sur parsing HTML
         url = f"https://chaturbate.com/{username}/"
-        logger.progress("Récupération page Chaturbate", username=username, url=url)
+        logger.progress("Fallback: Récupération page HTML", username=username, url=url)
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
