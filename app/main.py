@@ -640,15 +640,20 @@ async def list_recordings(username: str):
             duration_seconds = 0
             try:
                 import subprocess
-                result = subprocess.run([
-                    "ffprobe", "-v", "error",
-                    "-show_entries", "format=duration",
-                    "-of", "default=noprint_wrappers=1:nokey=1",
-                    str(ts_file)
-                ], capture_output=True, text=True, timeout=3)
-                if result.returncode == 0 and result.stdout.strip():
-                    duration_seconds = int(float(result.stdout.strip()))
-            except:
+                import shutil
+                
+                # Vérifier que ffprobe est disponible
+                if shutil.which("ffprobe"):
+                    result = subprocess.run([
+                        "ffprobe", "-v", "error",
+                        "-show_entries", "format=duration",
+                        "-of", "default=noprint_wrappers=1:nokey=1",
+                        str(ts_file)
+                    ], capture_output=True, text=True, timeout=3)
+                    if result.returncode == 0 and result.stdout.strip():
+                        duration_seconds = int(float(result.stdout.strip()))
+            except Exception as e:
+                print(f"⚠️ Erreur calcul durée pour {ts_file.name}: {e}")
                 pass
             
             # Formater la durée
@@ -907,14 +912,18 @@ async def auto_record_task():
                             print(f"🔴 Auto-démarrage enregistrement: {username}")
                             
                             # Lancer l'enregistrement
-                            session_id = manager.start(
-                                stream_url=hls_source,
-                                display_name=username,
-                                person=username
-                            )
-                            
-                            if session_id:
-                                print(f"✅ Enregistrement démarré: {username} (ID: {session_id})")
+                            try:
+                                sess = manager.start_session(
+                                    input_url=hls_source,
+                                    display_name=username,
+                                    person=username
+                                )
+                                
+                                if sess:
+                                    print(f"✅ Enregistrement démarré: {username} (ID: {sess.id})")
+                            except RuntimeError as e:
+                                print(f"⚠️ Impossible de démarrer {username}: {e}")
+                                continue
                             
                 except Exception as e:
                     print(f"Erreur vérification {username}: {e}")

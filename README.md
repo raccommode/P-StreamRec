@@ -162,7 +162,7 @@ Files are stored in `/data/records/<username>/YYYY-MM-DD.ts`
 
 ## Version
 
-Current version: **v1.0.0**
+Current version: **2025.40.B**
 
 See `version.json` for changelog and release information.
 
