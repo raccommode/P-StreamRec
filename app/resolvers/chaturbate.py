@@ -1,8 +1,13 @@
 import re
 import html
+import time
 import requests
 from .base import ResolveError
 from ..logger import logger
+
+# Rate limiting pour éviter HTTP 429
+_last_request_time = 0
+_min_delay_between_requests = 2.0  # 2 secondes entre chaque requête
 
 
 def resolve_m3u8(username: str) -> str:
