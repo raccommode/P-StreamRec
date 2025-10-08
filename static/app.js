@@ -1,6 +1,50 @@
 // ============================================
-// Gestion du LocalStorage pour les modèles
+// Cache pour performance instantanée
 // ============================================
+
+// Sauvegarder le cache des modèles
+function saveModelsCache(models) {
+  localStorage.setItem('models_cache', JSON.stringify({
+    models,
+    timestamp: Date.now()
+  }));
+}
+
+// Récupérer le cache des modèles
+function getModelsCache() {
+  const cached = localStorage.getItem('models_cache');
+  if (cached) {
+    const data = JSON.parse(cached);
+    // Cache valide pendant 5 minutes
+    if (Date.now() - data.timestamp < 300000) {
+      return data.models;
+    }
+  }
+  return null;
+}
+
+// Sauvegarder les infos des modèles
+function saveModelInfoCache(username, info) {
+  const key = `model_info_${username}`;
+  localStorage.setItem(key, JSON.stringify({
+    ...info,
+    timestamp: Date.now()
+  }));
+}
+
+// Récupérer les infos en cache
+function getModelInfoCache(username) {
+  const key = `model_info_${username}`;
+  const cached = localStorage.getItem(key);
+  if (cached) {
+    const data = JSON.parse(cached);
+    // Cache valide pendant 30 secondes
+    if (Date.now() - data.timestamp < 30000) {
+      return data;
+    }
+  }
+  return null;
+}
 
 // Charger les modèles depuis le serveur
 async function getModels() {
@@ -8,7 +52,9 @@ async function getModels() {
     const res = await fetch('/api/models');
     if (res.ok) {
       const data = await res.json();
-      return data.models || [];
+      const models = data.models || [];
+      saveModelsCache(models); // Sauvegarder en cache
+      return models;
     }
   } catch (e) {
     console.error('Erreur chargement modèles:', e);
@@ -106,30 +152,47 @@ async function addModel(event) {
 // Récupérer les informations d'un modèle
 // ============================================
 
-async function getModelInfo(username) {
+async function getModelInfo(username, useCache = true) {
+  // Essayer le cache d'abord pour l'affichage instantané
+  if (useCache) {
+    const cached = getModelInfoCache(username);
+    if (cached) {
+      // Retourner le cache immédiatement
+      // et mettre à jour en arrière-plan
+      getModelInfo(username, false).then(freshData => {
+        saveModelInfoCache(username, freshData);
+      });
+      return cached;
+    }
+  }
+  
   try {
     // Utiliser notre API backend pour éviter les problèmes CORS
     const response = await fetch(`/api/model/${username}/status`);
     if (response.ok) {
       const data = await response.json();
-      return {
+      const info = {
         username: data.username,
         thumbnail: data.thumbnail,
         isOnline: data.isOnline,
         viewers: data.viewers || 0
       };
+      saveModelInfoCache(username, info);
+      return info;
     }
   } catch (e) {
     console.error(`Erreur récupération infos ${username}:`, e);
   }
   
   // Fallback: utiliser l'image par défaut
-  return {
+  const fallback = {
     username: username,
     thumbnail: `https://roomimg.stream.highwebmedia.com/ri/${username}.jpg`,
     isOnline: false,
     viewers: 0
   };
+  saveModelInfoCache(username, fallback);
+  return fallback;
 }
 
 // ============================================
@@ -253,61 +316,120 @@ async function updateModelsStatus() {
 }
 
 async function renderModels() {
-  const models = await getModels();
+  // Essayer d'afficher le cache immédiatement pour l'illusion d'instantanéité
+  const cachedModels = getModelsCache();
+  let models = cachedModels || [];
+  
   const grid = document.getElementById('modelsGrid');
   const emptyState = document.getElementById('emptyState');
   
-  if (models.length === 0) {
+  // Afficher immédiatement le cache si disponible
+  if (models.length > 0) {
+    emptyState.style.display = 'none';
+    grid.innerHTML = '';
+    
+    // Section LIVE MODELS
+    const liveSection = document.createElement('div');
+    liveSection.id = 'liveSection';
+    liveSection.style.display = 'none';
+    liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    grid.appendChild(liveSection);
+    
+    // Section OFFLINE MODELS
+    const offlineSection = document.createElement('div');
+    offlineSection.id = 'offlineSection';
+    offlineSection.style.gridColumn = '1 / -1';
+    offlineSection.style.display = 'contents';
+    offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
+    grid.appendChild(offlineSection);
+    
+    // Créer les cartes IMMÉDIATEMENT
+    for (const model of models) {
+      const card = document.createElement('div');
+      card.className = 'model-card offline';
+      card.setAttribute('data-username', model.username);
+      card.onclick = () => openModelPage(model.username);
+      
+      // Utiliser les infos en cache si disponibles
+      const cachedInfo = getModelInfoCache(model.username);
+      const statusText = cachedInfo?.isOnline ? 'Live' : 'Offline';
+      const statusClass = cachedInfo?.isOnline ? 'online' : 'offline';
+      
+      card.innerHTML = `
+        <img 
+          src="/api/thumbnail/${model.username}" 
+          alt="${model.username}"
+          class="model-thumbnail"
+          style="filter: ${cachedInfo?.isOnline ? 'none' : 'grayscale(100%) brightness(0.7)'};"
+          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
+        />
+        <div class="model-info">
+          <div class="model-name">${model.username}</div>
+          <div class="model-status">
+            <span class="status-dot ${statusClass}"></span>
+            ${statusText}
+          </div>
+        </div>
+      `;
+      
+      grid.appendChild(card);
+    }
+  }
+  
+  // Charger les vraies données en arrière-plan
+  const freshModels = await getModels();
+  
+  if (freshModels.length === 0) {
     grid.innerHTML = '';
     emptyState.style.display = 'block';
     return;
   }
   
-  emptyState.style.display = 'none';
-  grid.innerHTML = '';
-  
-  // Section LIVE MODELS
-  const liveSection = document.createElement('div');
-  liveSection.id = 'liveSection';
-  liveSection.style.display = 'none'; // Masqué par défaut
-  liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
-  grid.appendChild(liveSection);
-  
-  // Section OFFLINE MODELS
-  const offlineSection = document.createElement('div');
-  offlineSection.id = 'offlineSection';
-  offlineSection.style.gridColumn = '1 / -1';
-  offlineSection.style.display = 'contents';
-  offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
-  grid.appendChild(offlineSection);
-  
-  // Créer les cartes IMMÉDIATEMENT avec des placeholders
-  for (const model of models) {
-    const card = document.createElement('div');
-    card.className = 'model-card offline';
-    card.setAttribute('data-username', model.username);
-    card.onclick = () => openModelPage(model.username);
+  // Si pas de cache, afficher maintenant
+  if (!cachedModels || cachedModels.length === 0) {
+    emptyState.style.display = 'none';
+    grid.innerHTML = '';
     
-    card.innerHTML = `
-      <img 
-        src="/api/thumbnail/${model.username}" 
-        alt="${model.username}"
-        class="model-thumbnail"
-        onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
-      />
-      <div class="model-info">
-        <div class="model-name">${model.username}</div>
-        <div class="model-status">
-          <span class="status-dot offline"></span>
-          Loading...
+    const liveSection = document.createElement('div');
+    liveSection.id = 'liveSection';
+    liveSection.style.display = 'none';
+    liveSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 1rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444;">🔴</span> Live Now</h2><div id="liveGrid" class="models-grid" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    grid.appendChild(liveSection);
+    
+    const offlineSection = document.createElement('div');
+    offlineSection.id = 'offlineSection';
+    offlineSection.style.gridColumn = '1 / -1';
+    offlineSection.style.display = 'contents';
+    offlineSection.innerHTML = '<h2 style="grid-column: 1 / -1; color: var(--text-primary); font-size: 1.5rem; margin: 2rem 0 0.5rem;">All Models</h2>';
+    grid.appendChild(offlineSection);
+    
+    for (const model of freshModels) {
+      const card = document.createElement('div');
+      card.className = 'model-card offline';
+      card.setAttribute('data-username', model.username);
+      card.onclick = () => openModelPage(model.username);
+      
+      card.innerHTML = `
+        <img 
+          src="/api/thumbnail/${model.username}" 
+          alt="${model.username}"
+          class="model-thumbnail"
+          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%231a1f3a%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23a0aec0%22 font-family=%22system-ui%22 font-size=%2220%22%3E${model.username}%3C/text%3E%3C/svg%3E'"
+        />
+        <div class="model-info">
+          <div class="model-name">${model.username}</div>
+          <div class="model-status">
+            <span class="status-dot offline"></span>
+            Loading...
+          </div>
         </div>
-      </div>
-    `;
-    
-    grid.appendChild(card);
+      `;
+      
+      grid.appendChild(card);
+    }
   }
   
-  // Ensuite mettre à jour dynamiquement les statuts
+  // Mettre à jour avec les vraies données
   updateModelsStatus();
 }
 

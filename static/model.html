@@ -749,6 +749,16 @@
     
     // Lire recording
     window.playRecording = function(url, filename) {
+      // SÉCURITÉ: Empêcher la lecture de l'enregistrement du jour en cours
+      const today = new Date().toISOString().split('T')[0];
+      const recordingDate = filename.replace('.ts', '');
+      
+      if (currentSession && currentSession.running && recordingDate === today) {
+        showNotification('⚠️ Recording in progress! Watch the live instead.', 'error');
+        window.switchTab('live');
+        return;
+      }
+      
       currentRecordingFile = filename;
       const video = document.getElementById('player');
       
