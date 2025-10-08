@@ -145,11 +145,18 @@ async function updateModelsStatus() {
     const liveSection = document.getElementById('liveSection');
     let liveCount = 0;
     
-    for (const model of models) {
+    // Charger TOUTES les infos en PARALLÈLE (beaucoup plus rapide)
+    const modelsInfo = await Promise.all(
+      models.map(model => getModelInfo(model.username))
+    );
+    
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      const modelInfo = modelsInfo[i];
+      
       const card = document.querySelector(`.model-card[data-username="${model.username}"]`);
       if (!card) continue; // Carte pas encore créée
       
-      const modelInfo = await getModelInfo(model.username);
       const isRecording = sessions.some(s => s.person === model.username && s.running);
       const isLive = isRecording || modelInfo.isOnline;
       
@@ -180,6 +187,21 @@ async function updateModelsStatus() {
           ${isRecording ? 'Recording' : modelInfo.isOnline ? 'Live' : 'Offline'}
           ${modelInfo.isOnline && modelInfo.viewers > 0 ? ` · ${modelInfo.viewers} viewers` : ''}
         `;
+      }
+      
+      // Mettre à jour la miniature
+      const thumbnail = card.querySelector('.model-thumbnail');
+      if (thumbnail) {
+        // Live/Recording : Couleur + rafraîchir
+        if (isLive) {
+          thumbnail.style.filter = 'none';
+          // Rafraîchir la miniature (cache bust)
+          const baseUrl = modelInfo.thumbnail.split('?')[0];
+          thumbnail.src = `${baseUrl}?t=${Date.now()}`;
+        } else {
+          // Offline : Noir et blanc
+          thumbnail.style.filter = 'grayscale(100%) brightness(0.7)';
+        }
       }
       
       // DÉPLACER les cartes LIVE dans la section LIVE
@@ -391,8 +413,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Afficher les modèles
   renderModels();
   
-  // Mettre à jour les statuts toutes les 30 secondes (dynamique, sans recharger)
-  setInterval(updateModelsStatus, 30000);
+  // Mettre à jour les statuts toutes les 15 secondes (rapide et dynamique)
+  setInterval(updateModelsStatus, 15000);
   
   // Vérifier et démarrer les enregistrements toutes les 60 secondes
   setInterval(checkAndStartRecordings, 60000);
