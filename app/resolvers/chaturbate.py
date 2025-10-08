@@ -1,6 +1,8 @@
 import re
+import html
 import requests
 from .base import ResolveError
+from ..logger import logger
 
 
 def resolve_m3u8(username: str) -> str:
@@ -8,21 +10,19 @@ def resolve_m3u8(username: str) -> str:
     Résolveur Chaturbate ultra-simplifié et fiable.
     Extrait directement le M3U8 depuis la page HTML.
     """
-    print(f"\n{'='*60}")
-    print(f"🔍 DÉBUT RÉSOLUTION M3U8 pour: {username}")
-    print(f"{'='*60}")
+    logger.subsection(f"🔍 Résolution M3U8 - {username}")
     
     username = username.strip().lower()
     if not username or not re.match(r'^[a-z0-9_]+$', username):
-        print(f"❌ Nom d'utilisateur invalide: {username}")
+        logger.error("Nom d'utilisateur invalide", username=username)
         raise ResolveError("Nom d'utilisateur invalide")
     
-    print(f"✅ Username validé: {username}")
+    logger.debug("Username validé", username=username)
     
     try:
         # Récupérer la page HTML
         url = f"https://chaturbate.com/{username}/"
-        print(f"📡 Récupération de la page: {url}")
+        logger.progress("Récupération page Chaturbate", username=username, url=url)
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -30,14 +30,14 @@ def resolve_m3u8(username: str) -> str:
         }
         
         resp = requests.get(url, headers=headers, timeout=10)
-        print(f"📥 Réponse HTTP: {resp.status_code}")
+        logger.debug("Réponse HTTP reçue", username=username, status_code=resp.status_code)
         
         if resp.status_code != 200:
-            print(f"❌ Erreur HTTP {resp.status_code}")
+            logger.error("Erreur HTTP", username=username, status_code=resp.status_code)
             raise ResolveError(f"Impossible d'accéder à la page (HTTP {resp.status_code})")
         
-        html = resp.text
-        print(f"📄 Page HTML récupérée ({len(html)} caractères)")
+        html_content = resp.text
+        logger.debug("Page HTML récupérée", username=username, size_chars=len(html_content))
         
         # Chercher le M3U8 avec patterns multiples et variés
         m3u8_patterns = [
@@ -56,14 +56,21 @@ def resolve_m3u8(username: str) -> str:
             r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',
         ]
         
-        print(f"🔎 Recherche du M3U8 avec {len(m3u8_patterns)} patterns...")
+        logger.debug("Recherche M3U8 avec patterns", 
+                    username=username, 
+                    pattern_count=len(m3u8_patterns))
         
         for i, pattern in enumerate(m3u8_patterns, 1):
-            print(f"   Pattern {i}/{len(m3u8_patterns)}: {pattern[:60]}...")
-            matches = re.findall(pattern, html, re.IGNORECASE)
+            logger.debug(f"Test pattern {i}/{len(m3u8_patterns)}", 
+                        username=username,
+                        pattern_preview=pattern[:60])
+            matches = re.findall(pattern, html_content, re.IGNORECASE)
             
             if matches:
-                print(f"   ✅ {len(matches)} match(es) trouvé(s) avec pattern {i}")
+                logger.debug("Pattern match trouvé", 
+                           username=username,
+                           pattern_index=i,
+                           match_count=len(matches))
                 # Prendre le premier match (ou le groupe capturé)
                 if isinstance(matches[0], tuple):
                     # Si c'est un tuple (groupes capturés), prendre le dernier élément non vide
@@ -75,68 +82,64 @@ def resolve_m3u8(username: str) -> str:
                 m3u8_url = m3u8_url.replace("\\/", "/").replace("\\", "")
                 
                 # Décoder les entités Unicode (u002D = -, u0022 = ", etc.)
-                import html
                 m3u8_url = html.unescape(m3u8_url)
                 
                 # Remplacer les codes Unicode hexadécimaux
-                import re as regex_module
                 def decode_unicode(match):
                     return chr(int(match.group(1), 16))
-                m3u8_url = regex_module.sub(r'u([0-9a-fA-F]{4})', decode_unicode, m3u8_url)
+                m3u8_url = re.sub(r'u([0-9a-fA-F]{4})', decode_unicode, m3u8_url)
                 
                 # Supprimer les caractères parasites à la fin
                 m3u8_url = m3u8_url.rstrip('",;: \t\n\r')
                 
-                print(f"   🎯 M3U8 candidat: {m3u8_url}")
+                logger.debug("M3U8 candidat trouvé", 
+                           username=username,
+                           url_preview=m3u8_url[:80])
                 
                 if m3u8_url.startswith("http") and ".m3u8" in m3u8_url:
-                    print(f"\n{'='*60}")
-                    print(f"✅ M3U8 TROUVÉ: {m3u8_url}")
-                    print(f"{'='*60}\n")
+                    logger.success("M3U8 résolu avec succès", 
+                                 username=username,
+                                 m3u8_url=m3u8_url,
+                                 pattern_used=i)
                     return m3u8_url
                 else:
-                    print(f"   ⚠️ URL invalide, continue...")
-            else:
-                print(f"   ❌ Aucun match avec pattern {i}")
+                    logger.debug("URL candidat invalide", 
+                               username=username,
+                               url=m3u8_url)
         
         # Si pas trouvé, vérifier si hors ligne
-        print(f"\n⚠️ Aucun M3U8 trouvé, vérification du statut...")
+        logger.warning("Aucun M3U8 trouvé, vérification statut", username=username)
         
-        if "offline" in html.lower():
-            print(f"❌ Utilisateur hors ligne (détecté dans HTML)")
+        html_lower = html_content.lower()
+        if "offline" in html_lower:
+            logger.info("Utilisateur détecté hors ligne", username=username)
             raise ResolveError(f"{username} est hors ligne")
         
-        # Debug: afficher un extrait du HTML
-        print(f"\n📋 Extrait HTML (premiers 500 chars):")
-        print(html[:500])
-        print(f"\n📋 Recherche 'hls' dans HTML (case-insensitive):")
-        html_lower = html.lower()
-        hls_occurrences = [i for i in range(len(html_lower)) if html_lower.startswith('hls', i)][:10]
-        if hls_occurrences:
-            for idx in hls_occurrences:
-                print(f"   Position {idx}: ...{html[max(0,idx-20):idx+150]}...")
-        else:
-            print(f"   ❌ Aucune occurrence de 'hls' trouvée")
+        # Debug: rechercher 'hls' et 'm3u8' dans le HTML
+        hls_count = html_lower.count('hls')
+        m3u8_count = html_lower.count('m3u8')
         
-        # Chercher aussi 'm3u8' directement
-        print(f"\n📋 Recherche 'm3u8' dans HTML:")
-        m3u8_occurrences = [i for i in range(len(html_lower)) if html_lower.startswith('m3u8', i)][:5]
-        if m3u8_occurrences:
-            for idx in m3u8_occurrences:
-                print(f"   Position {idx}: ...{html[max(0,idx-50):idx+100]}...")
-        else:
-            print(f"   ❌ Aucune occurrence de 'm3u8' trouvée")
+        logger.debug("Analyse HTML", 
+                    username=username,
+                    html_size=len(html_content),
+                    hls_occurrences=hls_count,
+                    m3u8_occurrences=m3u8_count,
+                    html_preview=html_content[:500])
         
-        print(f"\n❌ M3U8 non trouvé")
+        logger.error("M3U8 non trouvé", username=username)
         raise ResolveError(f"Impossible de trouver le flux M3U8 pour {username}")
         
     except requests.RequestException as e:
-        print(f"❌ Erreur réseau: {e}")
+        logger.error("Erreur réseau lors de la résolution", 
+                    username=username,
+                    exc_info=True,
+                    error=str(e))
         raise ResolveError(f"Erreur réseau: {str(e)}")
     except ResolveError:
         raise
     except Exception as e:
-        print(f"❌ Erreur inattendue: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.critical("Erreur inattendue dans le resolver", 
+                       username=username,
+                       exc_info=True,
+                       error=str(e))
         raise ResolveError(f"Erreur inattendue: {str(e)}")
