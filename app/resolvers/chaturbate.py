@@ -39,16 +39,30 @@ def resolve_m3u8(username: str) -> str:
         if api_resp.status_code == 200:
             api_data = api_resp.json()
             
-            # Chercher la meilleure qualité disponible
-            # Priorité: hls_source_high > hls_source > fallback HTML
-            best_m3u8 = None
+            # Logger TOUS les champs HLS disponibles pour debugging
+            hls_fields = {k: v[:80] if isinstance(v, str) else v for k, v in api_data.items() if 'hls' in k.lower() or 'm3u8' in str(v).lower()}
+            logger.debug("Champs HLS disponibles dans API", username=username, hls_fields=hls_fields)
             
-            if api_data.get('hls_source_high'):
-                best_m3u8 = api_data['hls_source_high']
-                logger.success("M3U8 HAUTE qualité trouvé via API", username=username, source="hls_source_high")
-            elif api_data.get('hls_source'):
-                best_m3u8 = api_data['hls_source']
-                logger.success("M3U8 qualité standard trouvé via API", username=username, source="hls_source")
+            # Chercher la meilleure qualité disponible
+            # Tester plusieurs noms possibles pour haute qualité
+            best_m3u8 = None
+            quality_source = None
+            
+            # Priorité des sources (de meilleure à moins bonne)
+            quality_checks = [
+                ('hls_source_hd', 'HD'),
+                ('hls_source_high', 'High'),
+                ('hls_source_720p', '720p'),
+                ('hls_source_1080p', '1080p'),
+                ('hls_source', 'Standard')
+            ]
+            
+            for field_name, quality_label in quality_checks:
+                if api_data.get(field_name):
+                    best_m3u8 = api_data[field_name]
+                    quality_source = f"{field_name} ({quality_label})"
+                    logger.success("M3U8 trouvé via API", username=username, source=quality_source, url_preview=best_m3u8[:80])
+                    break
             
             if best_m3u8:
                 logger.success("M3U8 résolu via API", username=username, m3u8_url=best_m3u8[:80])
