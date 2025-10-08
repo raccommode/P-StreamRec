@@ -534,8 +534,8 @@
   <div class="container">
     <!-- Onglets -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('live')">📺 Live</button>
-      <button class="tab-btn" onclick="switchTab('recordings')">📁 Recordings</button>
+      <button class="tab-btn active" onclick="switchTab('live', event)">📺 Live</button>
+      <button class="tab-btn" onclick="switchTab('recordings', event)">📁 Recordings</button>
     </div>
 
     <!-- Contenu Live -->
@@ -675,9 +675,22 @@
     let saveWatchProgressFunc = null;
     
     // Switch entre onglets
-    window.switchTab = function(tabName) {
+    window.switchTab = function(tabName, event) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      
+      // Si appelé depuis un bouton d'onglet, activer le bouton
+      if (event && event.target) {
+        event.target.classList.add('active');
+      } else {
+        // Sinon, trouver et activer le bon bouton
+        const buttons = document.querySelectorAll('.tab-btn');
+        buttons.forEach((btn, index) => {
+          if ((tabName === 'live' && index === 0) || (tabName === 'recordings' && index === 1)) {
+            btn.classList.add('active');
+          }
+        });
+      }
+      
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
       if (tabName === 'recordings' && loadRecordingsFunc) {
@@ -747,66 +760,11 @@
       }
     };
     
-    // Lire recording
-    window.playRecording = function(url, filename) {
-      // SÉCURITÉ: Empêcher la lecture de l'enregistrement du jour en cours
-      const today = new Date().toISOString().split('T')[0];
-      const recordingDate = filename.replace('.ts', '');
-      
-      if (currentSession && currentSession.running && recordingDate === today) {
-        showNotification('⚠️ Recording in progress! Watch the live instead.', 'error');
-        window.switchTab('live');
-        return;
-      }
-      
-      currentRecordingFile = filename;
-      const video = document.getElementById('player');
-      
-      // Arrêter HLS player si actif
-      if (hlsPlayer) {
-        hlsPlayer.destroy();
-        hlsPlayer = null;
-      }
-      
-      // Charger la vidéo
-      video.src = url;
-      
-      // Charger la progression si disponible
-      if (getWatchProgressFunc) {
-        const progress = getWatchProgressFunc(filename);
-        if (progress && progress.position > 10) {
-          video.addEventListener('loadedmetadata', () => {
-            video.currentTime = progress.position;
-            showNotification(`Resume at ${Math.floor(progress.position / 60)}:${Math.floor(progress.position % 60).toString().padStart(2, '0')}`, 'info');
-          }, { once: true });
-        }
-      }
-      
-      // Lancer la lecture
-      video.play().catch(e => {
-        console.error('Play error:', e);
-        showNotification('Click ▶️ to play', 'info');
-      });
-      
-      // Retourner à l'onglet Live pour voir le lecteur
-      window.switchTab('live');
-    };
+    // Lire recording (sera défini plus tard dans initializePage)
+    window.playRecording = null;
     
-    // Supprimer recording
-    window.deleteRecording = async function(filename) {
-      if (!confirm('Delete this recording?')) return;
-      try {
-        const res = await fetch(`/api/recordings/${username}/${filename}`, { method: 'DELETE' });
-        if (res.ok) {
-          showNotification('Recording deleted', 'success');
-          const key = `watch_progress_${username}_${filename}`;
-          localStorage.removeItem(key);
-          loadRecordings();
-        }
-      } catch (e) {
-        showNotification('Delete failed', 'error');
-      }
-    };
+    // Supprimer recording (sera défini plus tard dans initializePage)
+    window.deleteRecording = null;
 
     function initializePage() {
 
@@ -1096,6 +1054,8 @@
         showNotification(`Qualité: ${label}`, 'info');
       }
     }
+    // Exposer globalement
+    window.changeQuality = changeQuality;
 
     // Charger les enregistrements
     async function loadRecordings() {
@@ -1265,8 +1225,31 @@
       // Retourner à l'onglet Live pour voir le lecteur
       switchTab('live');
       
-      showNotification('Loading replay...', 'info');
+      showNotification('Chargement de la rediffusion...', 'info');
     }
+    // Exposer globalement pour l'utiliser depuis les boutons HTML
+    window.playRecording = playRecording;
+    
+    // Supprimer un enregistrement
+    async function deleteRecording(filename) {
+      if (!confirm('Supprimer cet enregistrement ?')) return;
+      try {
+        const res = await fetch(`/api/recordings/${username}/${filename}`, { method: 'DELETE' });
+        if (res.ok) {
+          showNotification('Enregistrement supprimé', 'success');
+          const key = `watch_progress_${username}_${filename}`;
+          localStorage.removeItem(key);
+          loadRecordings();
+        } else {
+          showNotification('Erreur lors de la suppression', 'error');
+        }
+      } catch (e) {
+        console.error('Erreur suppression:', e);
+        showNotification('Erreur lors de la suppression', 'error');
+      }
+    }
+    // Exposer globalement
+    window.deleteRecording = deleteRecording;
 
     // Supprimer le modèle
     async function deleteModel() {

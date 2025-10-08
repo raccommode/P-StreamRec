@@ -1,6 +1,5 @@
 {
   "version": "2025.40.A",
-  "releaseDate": "2025-10-08",
   "changelog": [
     "Complete logging system with colors and timestamps",
     "GitOps: One-click updates from web interface",
@@ -12,8 +11,5 @@
     "Live stream viewer with quality selector",
     "Automatic cleanup of old recordings",
     "Professional modular code structure"
-  ],
-  "NextUpdate": [
-    ""
   ]
 }
