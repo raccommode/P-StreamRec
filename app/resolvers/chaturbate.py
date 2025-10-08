@@ -65,6 +65,28 @@ def resolve_m3u8(username: str) -> str:
                     break
             
             if best_m3u8:
+                # ASTUCE: Si c'est un playlist.m3u8, charger et prendre la dernière ligne (meilleure qualité)
+                if 'playlist.m3u8' in best_m3u8:
+                    try:
+                        logger.debug("Playlist M3U8 détecté, extraction meilleure qualité", username=username)
+                        playlist_resp = requests.get(best_m3u8, headers=headers, timeout=10)
+                        if playlist_resp.status_code == 200:
+                            lines = playlist_resp.text.strip().split('\n')
+                            # La dernière ligne non-vide qui n'est pas un commentaire est la meilleure qualité
+                            for line in reversed(lines):
+                                line = line.strip()
+                                if line and not line.startswith('#'):
+                                    # C'est un chemin relatif, construire l'URL complète
+                                    base_url = best_m3u8.rsplit('/', 1)[0]
+                                    best_m3u8 = f"{base_url}/{line}"
+                                    logger.success("Meilleure qualité extraite du playlist", 
+                                                 username=username, 
+                                                 final_url=best_m3u8[:80])
+                                    break
+                    except Exception as e:
+                        logger.warning("Impossible d'extraire meilleure qualité du playlist, utilisation URL brute",
+                                     username=username, error=str(e))
+                
                 logger.success("M3U8 résolu via API", username=username, m3u8_url=best_m3u8[:80])
                 return best_m3u8
             
