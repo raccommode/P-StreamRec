@@ -189,10 +189,12 @@ async def get_version():
     version_file = BASE_DIR / "version.json"
     if version_file.exists():
         try:
-            with open(version_file, 'r') as f:
+            with open(version_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Erreur lecture version.json: {e}")
+    else:
+        logger.warning(f"Fichier version.json introuvable: {version_file}")
     return {"version": "1.0.0", "releaseDate": "2025-10-05"}
 
 
