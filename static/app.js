@@ -141,6 +141,11 @@ async function addModel(event) {
     
     closeAddModal();
     showNotification(`${username} ajouté avec succès!`, 'success');
+    
+    // Vider le cache pour forcer un rechargement depuis le serveur
+    localStorage.removeItem('dashboard_cache');
+    localStorage.removeItem('models_cache');
+    
     renderModels();
   } catch (e) {
     console.error('Erreur ajout modèle:', e);
