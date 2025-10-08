@@ -478,6 +478,7 @@
       opacity: 0.5;
     }
   </style>
+  <script src="/static/loader.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script>
     // Charger la version depuis l'API (synchronisée avec version.json)
@@ -496,24 +497,38 @@
   </script>
 </head>
 <body>
-  <header class="header">
-    <button class="back-btn" onclick="window.location.href='/'">←</button>
-    <div class="model-header">
-      <div class="model-title" id="modelName">Chargement...</div>
-      <span class="version" id="appVersion" style="margin-left: 1rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(99, 102, 241, 0.1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2);">...</span>
-      <div class="model-subtitle">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Vérification...</span>
-      </div>
-    </div>
-    <button class="action-btn" onclick="openSettingsModal()" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.3);" title="Paramètres">
-      ⚙️ Paramètres
-    </button>
-    <div class="lang-selector" style="display: flex; gap: 0.5rem; margin-left: 1rem;">
-      <button class="lang-btn" data-lang="fr" style="background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">🇫🇷 FR</button>
-      <button class="lang-btn" data-lang="en" style="background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">🇬🇧 EN</button>
-    </div>
-  </header>
+  <div id="header-placeholder"></div>
+  
+  <script>
+    // Customize header for model page
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const headerLeft = document.querySelector('.header-left');
+        const headerRight = document.getElementById('headerRight');
+        
+        if (headerLeft) {
+          // Replace logo with back button + model name
+          const logo = headerLeft.querySelector('.logo');
+          if (logo) {
+            logo.outerHTML = `
+              <button class="back-btn" onclick="window.location.href='/'" style="border: none; background: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer; padding: 0.5rem; margin-right: 1rem;">←</button>
+              <div style="display: flex; flex-direction: column;">
+                <div class="model-title" id="modelName" style="font-size: 1.25rem; font-weight: 600;">Loading...</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; margin-top: 0.25rem;">
+                  <span class="status-dot" id="statusDot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary);"></span>
+                  <span id="statusText" style="color: var(--text-secondary);">Checking...</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+        
+        if (headerRight) {
+          headerRight.innerHTML = '<button onclick="openSettingsModal()" style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 500;">⚙️ Settings</button>';
+        }
+      }, 100);
+    });
+  </script>
 
   <div class="container">
     <!-- Onglets -->
@@ -1346,5 +1361,7 @@
     // Rafraîchir toutes les 10 secondes (moins agressif)
     setInterval(updateModelStatus, 10000);
   </script>
+  
+  <div id="footer-placeholder"></div>
 </body>
 </html>

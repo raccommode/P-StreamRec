@@ -1,0 +1,12 @@
+<header class="header">
+  <div class="header-left">
+    <div class="logo" onclick="window.location.href='/'" style="cursor: pointer;">🎬 P-StreamRec</div>
+    <span class="version" id="appVersion">...</span>
+    <button id="gitStatusBtn" onclick="openGitModal()" style="display: none; margin-left: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: rgba(99, 102, 241, 0.1); color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s;">
+      <span id="gitStatusIcon">🔄</span> <span id="gitStatusText">GitOps</span>
+    </button>
+  </div>
+  <div class="header-right" id="headerRight">
+    <!-- Content injected by page -->
+  </div>
+</header>
