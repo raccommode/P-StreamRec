@@ -1,15 +1,6 @@
 {
-  "version": "2025.40.A",
+  "version": "2025.40.D",
   "changelog": [
-    "Complete logging system with colors and timestamps",
-    "GitOps: One-click updates from web interface",
-    "High quality M3U8 resolution (API priority)",
-    "Dynamic status updates without page reload",
-    "Per-model auto-record configuration",
-    "Configurable recording quality and retention",
-    "Centralized settings interface",
-    "Live stream viewer with quality selector",
-    "Automatic cleanup of old recordings",
-    "Professional modular code structure"
+    ""
   ]
 }
