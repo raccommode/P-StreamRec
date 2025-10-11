@@ -162,6 +162,27 @@
       margin-bottom: 1.5rem;
       border: 1px solid var(--border);
       min-height: 400px;
+      transition: all 0.3s ease;
+    }
+    
+    /* Theater Mode */
+    .player-container.theater-mode {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      border-radius: 0;
+      margin: 0;
+      z-index: 9999;
+      border: none;
+    }
+    
+    .player-container.theater-mode .video-player {
+      max-height: 100vh;
+      height: 100vh;
     }
     
     .video-player {
@@ -203,6 +224,34 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+    
+    .theater-mode-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 11;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .theater-mode-btn:hover {
+      background: rgba(0, 0, 0, 0.95);
+      border-color: var(--accent);
+    }
+    
+    .quality-selector.theater-mode {
+      top: 4rem;
     }
     
     .quality-selector label {
@@ -540,7 +589,11 @@
 
     <!-- Live Content -->
     <div id="tab-live" class="tab-content active">
-      <div class="player-container">
+      <div class="player-container" id="playerContainer">
+        <button class="theater-mode-btn" id="theaterBtn" onclick="toggleTheaterMode()" style="display: none;">
+          <span id="theaterIcon">🎬</span>
+          <span id="theaterText">Theater Mode</span>
+        </button>
         <video id="player" class="video-player" controls muted autoplay></video>
         <div class="quality-selector" id="qualitySelector" style="display: none;">
           <label for="qualitySelect">Quality:</label>
@@ -895,6 +948,15 @@
         playerContainer.classList.add('has-video');
       }
       
+      // Show theater mode button
+      const theaterBtn = document.getElementById('theaterBtn');
+      if (theaterBtn) {
+        theaterBtn.style.display = 'flex';
+      }
+      
+      // Setup volume management
+      setupVolumeManagement();
+      
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         console.log('📱 Using native player');
         video.src = url;
@@ -1203,6 +1265,15 @@
       // Show video container
       container.classList.add('has-video');
       
+      // Show theater mode button
+      const theaterBtn = document.getElementById('theaterBtn');
+      if (theaterBtn) {
+        theaterBtn.style.display = 'flex';
+      }
+      
+      // Setup volume management
+      setupVolumeManagement();
+      
       // Load video directly
       video.src = url;
       video.load();  // Force loading
@@ -1293,6 +1364,94 @@
       notif.textContent = message;
       document.body.appendChild(notif);
       setTimeout(() => notif.remove(), 3000);
+    }
+
+    // ============================================
+    // Theater Mode
+    // ============================================
+    
+    window.toggleTheaterMode = function() {
+      const container = document.getElementById('playerContainer');
+      const btn = document.getElementById('theaterBtn');
+      const icon = document.getElementById('theaterIcon');
+      const text = document.getElementById('theaterText');
+      const qualitySelector = document.getElementById('qualitySelector');
+      
+      container.classList.toggle('theater-mode');
+      
+      if (container.classList.contains('theater-mode')) {
+        icon.textContent = '🪟';
+        text.textContent = 'Exit Theater';
+        if (qualitySelector) {
+          qualitySelector.classList.add('theater-mode');
+        }
+      } else {
+        icon.textContent = '🎬';
+        text.textContent = 'Theater Mode';
+        if (qualitySelector) {
+          qualitySelector.classList.remove('theater-mode');
+        }
+      }
+    };
+    
+    // Escape key to exit theater mode
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const container = document.getElementById('playerContainer');
+        if (container && container.classList.contains('theater-mode')) {
+          toggleTheaterMode();
+        }
+      }
+    });
+    
+    // ============================================
+    // Volume Management (save & restore)
+    // ============================================
+    
+    // Save volume to localStorage
+    function saveVolume(volume) {
+      localStorage.setItem(`video_volume_${username}`, volume.toString());
+      console.log('💾 Volume saved:', volume);
+    }
+    
+    // Get saved volume (default 0.7 if not set)
+    function getSavedVolume() {
+      const saved = localStorage.getItem(`video_volume_${username}`);
+      return saved !== null ? parseFloat(saved) : 0.7;
+    }
+    
+    // Setup volume management on video player
+    function setupVolumeManagement() {
+      const video = document.getElementById('player');
+      if (!video) return;
+      
+      // Get saved volume
+      const savedVolume = getSavedVolume();
+      
+      // Set saved volume and start muted
+      video.volume = savedVolume;
+      video.muted = true;
+      
+      let wasMuted = true;
+      
+      // Listen for mute/unmute changes
+      video.addEventListener('volumechange', () => {
+        // User just unmuted
+        if (wasMuted && !video.muted) {
+          const currentSaved = getSavedVolume();
+          video.volume = currentSaved;
+          console.log('🔊 Unmuted, restored volume to:', currentSaved);
+        }
+        
+        // Save volume when user adjusts slider (only if unmuted)
+        if (!video.muted && video.volume > 0) {
+          saveVolume(video.volume);
+        }
+        
+        wasMuted = video.muted;
+      });
+      
+      console.log('🔊 Volume management ready. Saved volume:', savedVolume);
     }
 
     // Auto-start recording if online

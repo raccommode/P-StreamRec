@@ -1,14 +1,16 @@
 {
-  "version": "2025.42.A",
+  "version": "2025.41.B",
   "changelog": [
+    "NEW: Theater Mode for video player (fullscreen viewing)",
+    "NEW: Smart volume management (saves and restores your volume preference)",
     "NEW: Automatic MP4 conversion after stream ends (50-70% smaller)",
     "NEW: Initial scan of existing TS files at startup",
     "NEW: Unique recording ID per stream (timestamp + session ID)",
     "NEW: Size display in MB/GB format (switches at 1000 MB)",
-    "NEW: Background conversion task",
-    "NEW: Support for serving MP4 files in replays",
+    "NEW: Keyboard shortcut (ESC) to exit theater mode",
     "FIX: Conversion task now processes old recordings after restart",
     "FIX: Auto-detection of existing MP4 files",
+    "FIX: Video always starts muted then unmutes to saved volume",
     "IMPROVED: Recording naming system with timestamps",
     "IMPROVED: Database schema with MP4 fields",
     "IMPROVED: Frontend fully translated to English"
