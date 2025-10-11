@@ -20,6 +20,7 @@ from .ffmpeg_runner import FFmpegManager
 from .logger import logger
 from .core.database import Database
 from .tasks.monitor import monitor_models_task
+from .tasks.convert import auto_convert_recordings_task
 
 # Environment
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -72,30 +73,31 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Route protégée pour les enregistrements
 @app.get("/streams/records/{username}/{filename}")
 async def serve_recording_protected(username: str, filename: str):
-    """Sert un enregistrement avec vérification qu'il n'est pas en cours"""
+    """Sert un enregistrement (TS ou MP4) avec vérification qu'il n'est pas en cours"""
     from fastapi.responses import FileResponse
     
     logger.api_request("GET", f"/streams/records/{username}/{filename}")
     
     # Sécurité: vérifier le nom de fichier
-    if ".." in filename or "/" in filename or not filename.endswith(".ts"):
+    if ".." in filename or "/" in filename or not (filename.endswith(".ts") or filename.endswith(".mp4")):
         logger.warning("Tentative d'accès fichier invalide", username=username, filename=filename)
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     
-    # Vérifier que ce n'est pas l'enregistrement du jour en cours
-    today = datetime.now().strftime("%Y-%m-%d")
-    recording_date = filename.replace(".ts", "")
-    
-    # Vérifier si une session est active pour cet utilisateur
-    active_sessions = manager.list_status()
-    is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
-    
-    if is_recording and recording_date == today:
-        logger.warning("Accès bloqué à enregistrement en cours", username=username, filename=filename, date=today)
-        raise HTTPException(
-            status_code=403, 
-            detail="Cet enregistrement est en cours. Regardez le live à la place."
-        )
+    # Pour les fichiers TS, vérifier que ce n'est pas l'enregistrement en cours
+    if filename.endswith(".ts"):
+        today = datetime.now().strftime("%Y-%m-%d")
+        recording_date = filename.replace(".ts", "")
+        
+        # Vérifier si une session est active pour cet utilisateur
+        active_sessions = manager.list_status()
+        is_recording = any(s.get('person') == username and s.get('running') for s in active_sessions)
+        
+        if is_recording and recording_date == today:
+            logger.warning("Accès bloqué à enregistrement en cours", username=username, filename=filename, date=today)
+            raise HTTPException(
+                status_code=403, 
+                detail="Cet enregistrement est en cours. Regardez le live à la place."
+            )
     
     # Servir le fichier
     file_path = OUTPUT_DIR / "records" / username / filename
@@ -608,6 +610,7 @@ async def get_dashboard():
 async def list_recordings(username: str):
     """Liste les enregistrements depuis le cache SQLite (ultra-rapide)"""
     from datetime import datetime
+    from .core.utils import format_bytes
     
     # Récupérer depuis SQLite
     recordings_db = await db.get_recordings(username)
@@ -639,16 +642,32 @@ async def list_recordings(username: str):
         else:
             duration_str = f"{minutes}m{seconds:02d}s"
         
+        # Informations MP4 si converti
+        mp4_info = None
+        if rec.get('is_converted') and rec.get('mp4_path'):
+            mp4_path = Path(rec['mp4_path'])
+            if mp4_path.exists():
+                mp4_info = {
+                    "filename": mp4_path.name,
+                    "size": rec.get('mp4_size', 0),
+                    "size_formatted": format_bytes(rec.get('mp4_size', 0)),
+                    "url": f"/streams/records/{username}/{mp4_path.name}"
+                }
+        
         recordings.append({
+            "recordingId": rec.get('recording_id', file_path.stem),
             "filename": filename,
             "date": file_path.stem,
             "size": rec['file_size'],
+            "size_formatted": format_bytes(rec['file_size']),
             "size_mb": round(rec['file_size'] / 1024 / 1024, 2),
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "url": f"/streams/records/{username}/{filename}",
             "thumbnail": thumb_url if thumb_path.exists() else None,
             "duration": duration_seconds,
-            "duration_str": duration_str
+            "duration_str": duration_str,
+            "isConverted": bool(rec.get('is_converted', False)),
+            "mp4": mp4_info
         })
     
     return {"recordings": recordings}
@@ -1098,4 +1117,5 @@ async def startup_event():
     asyncio.create_task(monitor_models_task(db, manager, FFMPEG_PATH))
     asyncio.create_task(auto_record_task())
     asyncio.create_task(cleanup_old_recordings_task())
-    logger.info("🚀 Background tasks démarrés", tasks=["monitor", "auto-record", "cleanup"])
+    asyncio.create_task(auto_convert_recordings_task(db, OUTPUT_DIR, FFMPEG_PATH))
+    logger.info("🚀 Background tasks démarrés", tasks=["monitor", "auto-record", "cleanup", "convert"])

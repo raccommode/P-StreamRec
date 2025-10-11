@@ -11,11 +11,13 @@
 ## ✨ Features
 
 - 🎥 **24/7 automatic recording** - Monitors and records when users go live
+- 🎬 **Auto MP4 conversion** - Automatically converts recordings to compressed MP4 after stream ends
 - 🌐 **Web interface** - Manage recordings and watch replays in browser
 - 📦 **Docker ready** - One command to get started
 - 🔄 **GitOps updates** - Update directly from the interface
 - 🎯 **Chaturbate + m3u8 support** - Works with any HLS stream
-- 💾 **Smart storage** - Daily TS files, server-side persistence
+- 💾 **Smart storage** - Unique ID per recording, automatic compression
+- 📊 **Size display** - Shows file sizes in MB or GB (>1000 MB)
 
 ## ⚙️ Configuration (Environment Variables)
 
@@ -69,10 +71,14 @@ services:
 
 1. **Add a model**: Click **+** → Enter Chaturbate username or m3u8 URL
 2. **Auto-record**: System checks every 2 minutes and records when live
-3. **Watch replays**: Click model card → **Replays** tab
-4. **Update**: Click **GitOps** button in header to update app (Git deployment only)
+3. **Auto-convert**: When stream ends, system converts TS to MP4 (50-70% smaller)
+4. **Watch replays**: Click model card → **Replays** tab (TS or MP4 available)
+5. **Update**: Click **GitOps** button in header to update app (Git deployment only)
 
-**Recordings:** `/data/records/<username>/YYYY-MM-DD.ts` (MPEG-TS format)
+**Recording Format:**
+- Original: `/data/records/<username>/YYYYMMDD_HHMMSS_ID.ts` (MPEG-TS)
+- Converted: `/data/records/<username>/YYYYMMDD_HHMMSS_ID.mp4` (H.264, auto-generated)
+- Each recording has unique ID: `username_YYYYMMDD_HHMMSS_sessionID`
 
 ## 💻 Development
 
@@ -84,18 +90,28 @@ uvicorn app.main:app --reload
 
 ## 📂 File Management
 
-**Play recordings:**
-- VLC/MPV: Open `.ts` files directly
-- Browser: Use Replays tab in web interface
+**Automatic Conversion:**
+- System automatically converts TS → MP4 when stream ends
+- MP4 files are 50-70% smaller (H.264 codec, CRF 23)
+- Conversion runs in background, no user action needed
+- Both TS and MP4 available in Replays tab
 
-**Convert to MP4:**
+**Play recordings:**
+- **Browser**: Use Replays tab (supports TS and MP4)
+- **VLC/MPV**: Open files directly from `/data/records/<username>/`
+- **MP4**: Better for streaming, smaller file size
+- **TS**: Original quality, no re-encoding
+
+**Manual conversion (if needed):**
 ```bash
-ffmpeg -i input.ts -c copy output.mp4
+ffmpeg -i input.ts -c:v libx264 -crf 23 -c:a aac output.mp4
 ```
 
 ## ⚠️ Notes
 
-- Storage: ~2-4 GB/hour per stream
+- **Storage**: TS ~2-4 GB/hour, MP4 ~600 MB-1.2 GB/hour (after conversion)
+- **Sizes displayed**: MB for files < 1000 MB, GB for larger files
+- **Unique IDs**: Each recording has timestamp + session ID for easy identification
 - Use only for public, legally accessible content
 
 ## 📜 License

@@ -19,11 +19,14 @@ class FFmpegSession:
         self.created_at = datetime.utcnow().isoformat() + "Z"
         self.start_time = time.time()
         self.start_date = datetime.now().strftime("%Y-%m-%d")  # Date de début du stream
+        self.start_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # Timestamp complet
+        self.recording_id = f"{person}_{self.start_timestamp}_{session_id[:6]}"  # ID unique
         self.process: Optional[subprocess.Popen] = None
         # Playback HLS is served from /streams/sessions/<id>/stream.m3u8
         self.playback_url = f"/streams/sessions/{self.id}/stream.m3u8"
-        # Recording file using start date (single file per stream)
-        self.record_path = os.path.join(self.records_dir_for_person, f"{self.start_date}.ts")
+        # Recording file using unique name: YYYYMMDD_HHMMSS_ID.ts
+        self.record_filename = f"{self.start_timestamp}_{session_id[:6]}.ts"
+        self.record_path = os.path.join(self.records_dir_for_person, self.record_filename)
         self.log_path = os.path.join(self.sessions_dir, "ffmpeg.log")
         self._stop_evt = threading.Event()
         self._writer_thread: Optional[threading.Thread] = None

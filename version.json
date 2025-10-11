@@ -4,6 +4,13 @@
     "NEW: Add license badge",
     "NEW: Add Docker badge",
     "NEW: Add Open Source badge",
+    "NEW: Automatic MP4 conversion after stream ends (50-70% smaller)",
+    "NEW: Unique recording ID per stream (timestamp + session ID)",
+    "NEW: Size display in MB/GB format (switches at 1000 MB)",
+    "NEW: Background conversion task",
+    "NEW: Support for serving MP4 files in replays",
+    "IMPROVED: Recording naming system with timestamps",
+    "IMPROVED: Database schema with MP4 fields",
     "FIX: Footer version not displayed",
     "FIX: Translated to English"
   ]

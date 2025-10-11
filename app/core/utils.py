@@ -46,19 +46,22 @@ def extract_username(url: str) -> Optional[str]:
 
 def format_bytes(bytes_value: int) -> str:
     """
-    Formate une taille en bytes de manière lisible
+    Formate une taille en bytes de manière lisible (MB ou GB si > 1000 MB)
     
     Args:
         bytes_value: Taille en bytes
         
     Returns:
-        Chaîne formatée (ex: "1.5 GB", "256.3 MB")
+        Chaîne formatée (ex: "1.5 GB", "256 MB")
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_value < 1024.0:
-            return f"{bytes_value:.1f} {unit}"
-        bytes_value /= 1024.0
-    return f"{bytes_value:.1f} PB"
+    mb = bytes_value / (1024 * 1024)
+    
+    # Si >= 1000 MB, afficher en GB
+    if mb >= 1000:
+        gb = mb / 1024
+        return f"{gb:.2f} GB"
+    else:
+        return f"{mb:.1f} MB"
 
 
 def format_duration(seconds: float) -> str:

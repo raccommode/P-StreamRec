@@ -43,11 +43,15 @@ class Database:
                 CREATE TABLE IF NOT EXISTS recordings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT NOT NULL,
+                    recording_id TEXT NOT NULL,
                     filename TEXT NOT NULL,
                     file_path TEXT NOT NULL,
                     file_size INTEGER,
                     duration_seconds INTEGER,
                     thumbnail_path TEXT,
+                    mp4_path TEXT,
+                    mp4_size INTEGER,
+                    is_converted BOOLEAN DEFAULT 0,
                     created_at INTEGER,
                     UNIQUE(username, filename)
                 )
@@ -195,29 +199,41 @@ class Database:
         filename: str,
         file_path: str,
         file_size: int,
+        recording_id: Optional[str] = None,
         duration_seconds: int = 0,
-        thumbnail_path: Optional[str] = None
+        thumbnail_path: Optional[str] = None,
+        mp4_path: Optional[str] = None,
+        mp4_size: Optional[int] = None,
+        is_converted: bool = False
     ):
         """Ajoute ou met à jour un enregistrement"""
         await self.initialize()
         
         now = int(datetime.now().timestamp())
         
+        # Générer recording_id si non fourni
+        if not recording_id:
+            from datetime import datetime
+            recording_id = f"{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 INSERT INTO recordings (
-                    username, filename, file_path, file_size, 
-                    duration_seconds, thumbnail_path, created_at
+                    username, recording_id, filename, file_path, file_size, 
+                    duration_seconds, thumbnail_path, mp4_path, mp4_size, is_converted, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(username, filename) DO UPDATE SET
                     file_size = ?,
                     duration_seconds = ?,
-                    thumbnail_path = COALESCE(?, thumbnail_path)
+                    thumbnail_path = COALESCE(?, thumbnail_path),
+                    mp4_path = COALESCE(?, mp4_path),
+                    mp4_size = COALESCE(?, mp4_size),
+                    is_converted = ?
             """, (
-                username, filename, file_path, file_size,
-                duration_seconds, thumbnail_path, now,
-                file_size, duration_seconds, thumbnail_path
+                username, recording_id, filename, file_path, file_size,
+                duration_seconds, thumbnail_path, mp4_path, mp4_size, is_converted, now,
+                file_size, duration_seconds, thumbnail_path, mp4_path, mp4_size, is_converted
             ))
             await db.commit()
     

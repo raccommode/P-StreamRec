@@ -292,11 +292,23 @@ async def update_recordings_cache(db: 'Database', username: str, output_dir: Pat
                 if thumbnail_path:
                     logger.debug("Miniature générée", username=username, filename=ts_file.name, thumb=thumbnail_path)
             
+            # Générer recording_id si c'est un nouvel enregistrement
+            recording_id = None
+            if existing_rec:
+                recording_id = existing_rec.get('recording_id')
+            
+            if not recording_id:
+                # Extraire le timestamp du nom de fichier (format: YYYYMMDD_HHMMSS_xxx.ts)
+                # Sinon générer un nouveau recording_id
+                from datetime import datetime
+                recording_id = f"{username}_{ts_file.stem}"
+            
             await db.add_or_update_recording(
                 username=username,
                 filename=ts_file.name,
                 file_path=str(ts_file),
                 file_size=stat.st_size,
+                recording_id=recording_id,
                 duration_seconds=duration_seconds,
                 thumbnail_path=thumbnail_path
             )
