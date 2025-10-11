@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Modèle - P-StreamRec</title>
+  <title>Model - P-StreamRec</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -248,7 +248,7 @@
       color: var(--text-primary);
     }
     
-    /* Onglets */
+    /* Tabs */
     .tabs {
       display: flex;
       gap: 0.5rem;
@@ -482,7 +482,7 @@
   <script src="/static/loader.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script>
-    // Charger la version depuis l'API (synchronisée avec version.json)
+    // Load version from API (synchronized with version.json)
     (async function loadVersion() {
       try {
         const res = await fetch('/api/version');
@@ -490,7 +490,7 @@
         const versionEl = document.getElementById('appVersion');
         if (versionEl) versionEl.textContent = `v${data.version}`;
       } catch (e) {
-        console.error('Erreur chargement version:', e);
+        console.error('Error loading version:', e);
         const versionEl = document.getElementById('appVersion');
         if (versionEl) versionEl.textContent = 'v?.?.?';
       }
@@ -532,13 +532,13 @@
   </script>
 
   <div class="container">
-    <!-- Onglets -->
+    <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('live', event)">📺 Live</button>
       <button class="tab-btn" onclick="switchTab('recordings', event)">📁 Recordings</button>
     </div>
 
-    <!-- Contenu Live -->
+    <!-- Live Content -->
     <div id="tab-live" class="tab-content active">
       <div class="player-container">
         <video id="player" class="video-player" controls muted autoplay></video>
@@ -555,7 +555,7 @@
       </div>
     </div>
 
-    <!-- Contenu Rediffusions -->
+    <!-- Recordings Content -->
     <div id="tab-recordings" class="tab-content">
       <div class="recordings-section">
         <div class="section-header">
@@ -563,13 +563,13 @@
           <span class="recording-meta" id="recordingsCount">0 files</span>
         </div>
         <div class="recordings-list" id="recordingsList">
-          <!-- Les enregistrements seront ajoutés ici -->
+          <!-- Recordings will be added here -->
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Paramètres -->
+  <!-- Settings Modal -->
   <div class="modal" id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-content" style="background: var(--bg-card); padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
       <h2 style="margin-bottom: 1.5rem; color: var(--text-primary);">⚙️ Model Settings</h2>
@@ -650,7 +650,7 @@
       window.location.href = '/';
     }
 
-    // Attendre que le DOM soit chargé ET que le header soit injecté
+    // Wait for DOM to be loaded AND header to be injected
     let initAttempts = 0;
     const initInterval = setInterval(() => {
       const modelNameEl = document.getElementById('modelName');
@@ -658,7 +658,7 @@
         clearInterval(initInterval);
         if (modelNameEl) {
           modelNameEl.textContent = username;
-          // Lancer l'initialisation
+          // Launch initialization
           initializePage();
         }
       }
@@ -666,23 +666,23 @@
     }, 100);
 
     // ============================================
-    // FONCTIONS GLOBALES (appelées depuis HTML)
+    // GLOBAL FUNCTIONS (called from HTML)
     // ============================================
     
-    // Variables pour stocker les fonctions internes
+    // Variables to store internal functions
     let loadRecordingsFunc = null;
     let getWatchProgressFunc = null;
     let saveWatchProgressFunc = null;
     
-    // Switch entre onglets
+    // Switch between tabs
     window.switchTab = function(tabName, event) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       
-      // Si appelé depuis un bouton d'onglet, activer le bouton
+      // If called from tab button, activate the button
       if (event && event.target) {
         event.target.classList.add('active');
       } else {
-        // Sinon, trouver et activer le bon bouton
+        // Otherwise, find and activate the right button
         const buttons = document.querySelectorAll('.tab-btn');
         buttons.forEach((btn, index) => {
           if ((tabName === 'live' && index === 0) || (tabName === 'recordings' && index === 1)) {
@@ -698,7 +698,7 @@
       }
     };
     
-    // Ouvrir modal settings
+    // Open settings modal
     window.openSettingsModal = async function() {
       try {
         const res = await fetch('/api/models');
@@ -717,12 +717,12 @@
       document.getElementById('settingsModal').style.display = 'flex';
     };
     
-    // Fermer modal settings
+    // Close settings modal
     window.closeSettingsModal = function() {
       document.getElementById('settingsModal').style.display = 'none';
     };
     
-    // Sauvegarder settings
+    // Save settings
     window.saveSettings = async function(e) {
       e.preventDefault();
       const quality = document.getElementById('settingsQuality').value;
@@ -746,7 +746,7 @@
       }
     };
     
-    // Supprimer depuis modal
+    // Delete from modal
     window.deleteModelFromSettings = async function() {
       if (!confirm(`Delete ${username} from your list?`)) return;
       try {
@@ -760,23 +760,23 @@
       }
     };
     
-    // Lire recording (sera défini plus tard dans initializePage)
+    // Play recording (will be defined later in initializePage)
     window.playRecording = null;
     
-    // Supprimer recording (sera défini plus tard dans initializePage)
+    // Delete recording (will be defined later in initializePage)
     window.deleteRecording = null;
 
     function initializePage() {
 
-    // Récupérer l'état du modèle
+    // Get model status
     async function updateModelStatus() {
       try {
-        // Récupérer les sessions actives
+        // Get active sessions
         const res = await fetch('/api/status');
         const sessions = await res.json();
         const session = sessions.find(s => s.person === username);
 
-        // Récupérer le statut en ligne
+        // Get online status
         const statusRes = await fetch(`/api/model/${username}/status`);
         const modelInfo = statusRes.ok ? await statusRes.json() : { isOnline: false };
 
@@ -784,19 +784,19 @@
           const wasRecording = currentSession && currentSession.id === session.id;
           currentSession = session;
           
-          console.log('📊 Session trouvée:', session);
+          console.log('📊 Session found:', session);
           console.log('📺 Playback URL:', session.playback_url);
-          console.log('🔄 Était déjà en enregistrement:', wasRecording);
+          console.log('🔄 Was already recording:', wasRecording);
           
           document.getElementById('statusDot').className = 'status-dot recording';
           document.getElementById('statusText').textContent = 'Recording';
           
-          // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
+          // Load stream ONLY if it wasn't already running
           if (!wasRecording) {
-            console.log('▶️ Chargement du stream...');
+            console.log('▶️ Loading stream...');
             loadStream(session.playback_url);
           } else {
-            console.log('⏭️ Stream déjà chargé, skip');
+            console.log('⏭️ Stream already loaded, skip');
           }
         } else if (modelInfo.isOnline) {
           currentSession = null;
@@ -808,26 +808,26 @@
           document.getElementById('statusText').textContent = 'Offline';
         }
       } catch (e) {
-        console.error('Erreur statut:', e);
+        console.error('Status error:', e);
       }
     }
 
-    // Toggle enregistrement
+    // Toggle recording
     async function toggleRecording() {
       if (currentSession) {
-        // Arrêter
+        // Stop
         try {
           const res = await fetch(`/api/stop/${currentSession.id}`, { method: 'POST' });
           if (res.ok) {
-            showNotification('Enregistrement arrêté');
+            showNotification('Recording stopped');
             await updateModelStatus();
             updateManualRecordButton();
           }
         } catch (e) {
-          showNotification('Erreur lors de l\'arrêt', 'error');
+          showNotification('Error stopping', 'error');
         }
       } else {
-        // Démarrer
+        // Start
         try {
           const res = await fetch('/api/start', {
             method: 'POST',
@@ -842,103 +842,103 @@
           
           if (res.ok) {
             const data = await res.json();
-            showNotification('Enregistrement démarré!');
+            showNotification('Recording started!');
             await updateModelStatus();
             updateManualRecordButton();
           } else if (res.status === 409) {
-            // Session déjà en cours, charger le stream quand même
-            console.log('⏭️ Session déjà en cours, chargement du stream...');
+            // Session already running, load stream anyway
+            console.log('⏭️ Session already running, loading stream...');
             await updateModelStatus();
             updateManualRecordButton();
           } else {
             const error = await res.json();
-            showNotification(error.detail || 'Erreur', 'error');
+            showNotification(error.detail || 'Error', 'error');
           }
         } catch (e) {
-          showNotification('Erreur lors du démarrage', 'error');
+          showNotification('Error starting', 'error');
         }
       }
     }
 
-    // Charger le stream avec retry si le manifest n'est pas encore prêt
+    // Load stream with retry if manifest not ready yet
     async function loadStream(url) {
-      console.log('🎬 Chargement du stream:', url);
+      console.log('🎬 Loading stream:', url);
       const video = document.getElementById('player');
       
-      // Attendre que le manifest soit disponible (max 10 tentatives)
+      // Wait for manifest to be available (max 10 attempts)
       let retries = 10;
       while (retries > 0) {
         try {
           const checkResponse = await fetch(url, { method: 'HEAD' });
           if (checkResponse.ok) {
-            console.log('✅ Manifest disponible');
+            console.log('✅ Manifest available');
             break;
           }
         } catch (e) {
-          console.log(`⏳ Manifest pas encore disponible, attente... (${retries} tentatives restantes)`);
+          console.log(`⏳ Manifest not yet available, waiting... (${retries} attempts remaining)`);
         }
         retries--;
         if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
         }
       }
       
       if (retries === 0) {
-        console.error('❌ Manifest toujours indisponible après 10 secondes');
-        showNotification('Stream non disponible, réessayez dans quelques secondes', 'error');
+        console.error('❌ Manifest still unavailable after 10 seconds');
+        showNotification('Stream unavailable, try again in a few seconds', 'error');
         return;
       }
       
-      // Marquer le conteneur comme ayant une vidéo
+      // Mark container as having video
       const playerContainer = document.querySelector('.player-container');
       if (playerContainer) {
         playerContainer.classList.add('has-video');
       }
       
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        console.log('📱 Utilisation du lecteur natif');
+        console.log('📱 Using native player');
         video.src = url;
-        video.muted = true; // Son coupé
-        // Démarrer automatiquement
+        video.muted = true; // Muted
+        // Auto-start
         video.play().catch(e => {
-          console.log('Autoplay bloqué');
-          showNotification('Cliquez sur ▶️ pour lancer', 'info');
+          console.log('Autoplay blocked');
+          showNotification('Click ▶️ to play', 'info');
         });
       } else if (window.Hls && window.Hls.isSupported()) {
-        console.log('🎥 Utilisation de HLS.js');
+        console.log('🎥 Using HLS.js');
         if (hlsPlayer) {
           hlsPlayer.destroy();
         }
         hlsPlayer = new Hls({ 
           debug: false,
           enableWorker: false,
-          capLevelToPlayerSize: false,  // Ne pas limiter la qualité à la taille du lecteur
+          capLevelToPlayerSize: false,  // Don't limit quality to player size
         });
         
-        // Gestion des erreurs HLS
+        // HLS error handling
         hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
-          console.error('❌ Erreur HLS:', data);
+          console.error('❌ HLS Error:', data);
           console.error('Type:', data.type, 'Fatal:', data.fatal, 'Details:', data.details);
           
-          // Afficher l'erreur à l'utilisateur
-          const errorMsg = `Erreur HLS: ${data.details} (${data.type})`;
+          // Show error to user
+          const errorMsg = `HLS Error: ${data.details} (${data.type})`;
           showNotification(errorMsg, 'error');
           
           if (data.fatal) {
             switch(data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log('🔄 Erreur réseau, tentative de récupération...');
-                showNotification('Erreur réseau, reconnexion...', 'info');
+                console.log('🔄 Network error, attempting recovery...');
+                showNotification('Network error, reconnecting...', 'info');
                 hlsPlayer.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log('🔄 Erreur média, tentative de récupération...');
-                showNotification('Erreur média, récupération...', 'info');
+                console.log('🔄 Media error, attempting recovery...');
+                showNotification('Media error, recovering...', 'info');
                 hlsPlayer.recoverMediaError();
                 break;
               default:
-                console.error('💥 Erreur fatale, rechargement...');
-                showNotification('Erreur fatale, rechargement dans 2s...', 'error');
+                console.error('💥 Fatal error, reloading...');
+                showNotification('Fatal error, reloading in 2s...', 'error');
                 hlsPlayer.destroy();
                 setTimeout(() => loadStream(url), 2000);
                 break;
@@ -950,52 +950,52 @@
         hlsPlayer.attachMedia(video);
         
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('✅ Manifest chargé, démarrage lecture...');
+          console.log('✅ Manifest loaded, starting playback...');
           
-          // FORCER LA MEILLEURE QUALITÉ IMMÉDIATEMENT
+          // FORCE BEST QUALITY IMMEDIATELY
           if (hlsPlayer.levels.length > 0) {
             const highestLevel = hlsPlayer.levels.length - 1;
-            hlsPlayer.currentLevel = highestLevel;  // Forcer immédiatement
-            hlsPlayer.loadLevel = highestLevel;  // Forcer le chargement
-            hlsPlayer.autoLevelCapping = highestLevel;  // Limiter le plafond
-            hlsPlayer.startLevel = highestLevel;  // Démarrer au max
-            console.log(`🎚️ Meilleure qualité forcée: ${hlsPlayer.levels[highestLevel].height}p`);
-            showNotification(`Qualité: ${hlsPlayer.levels[highestLevel].height}p (Max)`, 'success');
+            hlsPlayer.currentLevel = highestLevel;  // Force immediately
+            hlsPlayer.loadLevel = highestLevel;  // Force loading
+            hlsPlayer.autoLevelCapping = highestLevel;  // Cap ceiling
+            hlsPlayer.startLevel = highestLevel;  // Start at max
+            console.log(`🎚️ Best quality forced: ${hlsPlayer.levels[highestLevel].height}p`);
+            showNotification(`Quality: ${hlsPlayer.levels[highestLevel].height}p (Max)`, 'success');
           }
           
-          // Afficher le sélecteur de qualité si plusieurs niveaux disponibles
+          // Show quality selector if multiple levels available
           if (hlsPlayer.levels.length > 1) {
             updateQualitySelector();
           }
           
-          // Son coupé pour autoplay
+          // Muted for autoplay
           video.muted = true;
-          // Démarrer automatiquement
+          // Auto-start
           video.play().then(() => {
-            console.log('✅ Lecture démarrée (son coupé)');
-            showNotification('Lecture démarrée (cliquez 🔊 pour activer le son)', 'info');
+            console.log('✅ Playback started (muted)');
+            showNotification('Playback started (click 🔊 to enable sound)', 'info');
           }).catch(e => {
-            console.log('Autoplay bloqué');
-            showNotification('Cliquez sur ▶️ pour lancer', 'info');
+            console.log('Autoplay blocked');
+            showNotification('Click ▶️ to play', 'info');
           });
         });
         
         hlsPlayer.on(Hls.Events.LEVEL_LOADED, (event, data) => {
-          console.log('✅ Niveau chargé:', data.level, 'Segments:', data.details.fragments.length);
+          console.log('✅ Level loaded:', data.level, 'Segments:', data.details.fragments.length);
         });
         
         hlsPlayer.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-          console.log('🎚️ Qualité changée:', data.level);
+          console.log('🎚️ Quality changed:', data.level);
           updateQualitySelector();
         });
         
       } else {
-        console.error('HLS non supporté par ce navigateur');
-        showNotification('HLS non supporté', 'error');
+        console.error('HLS not supported by this browser');
+        showNotification('HLS not supported', 'error');
       }
     }
 
-    // Mettre à jour le sélecteur de qualité
+    // Update quality selector
     function updateQualitySelector() {
       if (!hlsPlayer || hlsPlayer.levels.length <= 1) {
         document.getElementById('qualitySelector').style.display = 'none';
@@ -1005,10 +1005,10 @@
       const selector = document.getElementById('qualitySelector');
       const select = document.getElementById('qualitySelect');
       
-      // Vider les options
-      select.innerHTML = '<option value="-1">🎯 Meilleure</option>';
+      // Clear options
+      select.innerHTML = '<option value="-1">🎯 Best</option>';
       
-      // Ajouter toutes les qualités disponibles
+      // Add all available qualities
       hlsPlayer.levels.forEach((level, index) => {
         const height = level.height;
         const bitrate = Math.round(level.bitrate / 1000);
@@ -1025,54 +1025,54 @@
         select.appendChild(option);
       });
       
-      // Afficher le sélecteur
+      // Show selector
       selector.style.display = 'flex';
       
-      console.log(`🎚️ ${hlsPlayer.levels.length} qualités disponibles`);
+      console.log(`🎚️ ${hlsPlayer.levels.length} qualities available`);
     }
     
-    // Changer la qualité
+    // Change quality
     function changeQuality(levelIndex) {
       if (!hlsPlayer) return;
       
       const level = parseInt(levelIndex);
       
       if (level === -1) {
-        // Mode Auto = Forcer la meilleure qualité disponible
+        // Auto mode = Force best available quality
         const highestLevel = hlsPlayer.levels.length - 1;
         hlsPlayer.loadLevel = highestLevel;
         hlsPlayer.autoLevelCapping = highestLevel;
         const bestLevel = hlsPlayer.levels[highestLevel];
         const label = bestLevel.height ? `${bestLevel.height}p` : `${Math.round(bestLevel.bitrate / 1000)} kbps`;
-        console.log(`🎚️ Mode Auto: Meilleure qualité forcée (${label})`);
-        showNotification(`Qualité: Meilleure (${label})`, 'info');
+        console.log(`🎚️ Auto mode: Best quality forced (${label})`);
+        showNotification(`Quality: Best (${label})`, 'info');
       } else {
         hlsPlayer.currentLevel = level;
         const selectedLevel = hlsPlayer.levels[level];
         const label = selectedLevel.height ? `${selectedLevel.height}p` : `${Math.round(selectedLevel.bitrate / 1000)} kbps`;
-        console.log(`🎚️ Qualité sélectionnée: ${label}`);
-        showNotification(`Qualité: ${label}`, 'info');
+        console.log(`🎚️ Quality selected: ${label}`);
+        showNotification(`Quality: ${label}`, 'info');
       }
     }
-    // Exposer globalement
+    // Expose globally
     window.changeQuality = changeQuality;
 
-    // Charger les enregistrements
+    // Load recordings
     async function loadRecordings() {
       const list = document.getElementById('recordingsList');
       const count = document.getElementById('recordingsCount');
       
-      // Rendre accessible globalement
+      // Make globally accessible
       loadRecordingsFunc = loadRecordings;
       
       try {
         const res = await fetch(`/api/recordings/${username}`);
         const data = await res.json();
         
-        // Filtrer les enregistrements: NE PAS afficher celui en cours (aujourd'hui)
+        // Filter recordings: DO NOT show current one (today)
         const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
         const recordings = (data.recordings || []).filter(rec => {
-          // Si un enregistrement est en cours pour aujourd'hui, on ne l'affiche pas
+          // If recording in progress for today, don't show it
           if (currentSession && currentSession.running && rec.date === today) {
             return false;
           }
@@ -1086,7 +1086,7 @@
             const progress = getWatchProgress(rec.filename);
             const progressPercent = progress ? Math.round((progress.position / progress.duration) * 100) : 0;
             
-            // Formater le temps de progression
+            // Format progress time
             let progressTimeStr = '';
             if (progress && progress.position > 0) {
               const pos = Math.floor(progress.position);
@@ -1144,44 +1144,44 @@
           count.textContent = '0 files';
         }
       } catch (e) {
-        console.error('Erreur chargement enregistrements:', e);
+        console.error('Error loading recordings:', e);
         list.innerHTML = `
           <div class="empty-message">
             <div class="icon">⚠️</div>
-            <p>Erreur de chargement</p>
+            <p>Loading error</p>
           </div>
         `;
       }
     }
     
-    // Sauvegarder la progression de lecture
+    // Save playback progress
     function saveWatchProgress(filename, position, duration) {
       const key = `watch_progress_${username}_${filename}`;
       localStorage.setItem(key, JSON.stringify({ position, duration, timestamp: Date.now() }));
     }
-    saveWatchProgressFunc = saveWatchProgress; // Rendre accessible
+    saveWatchProgressFunc = saveWatchProgress; // Make accessible
     
-    // Récupérer la progression de lecture
+    // Get playback progress
     function getWatchProgress(filename) {
       const key = `watch_progress_${username}_${filename}`;
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     }
-    getWatchProgressFunc = getWatchProgress; // Rendre accessible
+    getWatchProgressFunc = getWatchProgress; // Make accessible
     
-    // Variable pour suivre l'enregistrement en cours
+    // Variable to track current recording
     let currentRecordingFile = null;
     
-    // Lire un enregistrement
+    // Play a recording
     function playRecording(url, filename) {
-      console.log('📹 Lecture enregistrement:', url);
+      console.log('📹 Playing recording:', url);
       
-      // SÉCURITÉ: Empêcher la lecture de l'enregistrement du jour en cours
+      // SECURITY: Prevent playback of current day recording
       const today = new Date().toISOString().split('T')[0];
       const recordingDate = filename.replace('.ts', '');
       
       if (currentSession && currentSession.running && recordingDate === today) {
-        showNotification('⚠️ Enregistrement en cours ! Regardez le live au lieu de la rediffusion.', 'error');
+        showNotification('⚠️ Recording in progress! Watch live instead of replay.', 'error');
         switchTab('live');
         return;
       }
@@ -1189,71 +1189,71 @@
       const video = document.getElementById('player');
       const container = document.querySelector('.player-container');
       
-      // Arrêter le lecteur HLS si actif
+      // Stop HLS player if active
       if (hlsPlayer) {
         hlsPlayer.destroy();
         hlsPlayer = null;
       }
       
-      // Masquer le sélecteur de qualité (pas de HLS pour les rediffusions)
+      // Hide quality selector (no HLS for replays)
       document.getElementById('qualitySelector').style.display = 'none';
       
       currentRecordingFile = filename;
       
-      // Afficher le conteneur vidéo
+      // Show video container
       container.classList.add('has-video');
       
-      // Charger la vidéo directement
+      // Load video directly
       video.src = url;
-      video.load();  // Force le chargement
+      video.load();  // Force loading
       
-      // Reprendre à la position sauvegardée
+      // Resume at saved position
       const progress = getWatchProgress(filename);
       if (progress && progress.position > 10) {
         video.addEventListener('loadedmetadata', () => {
           video.currentTime = progress.position;
-          showNotification(`Reprise à ${Math.floor(progress.position / 60)}min ${Math.floor(progress.position % 60)}s`, 'info');
+          showNotification(`Resuming at ${Math.floor(progress.position / 60)}min ${Math.floor(progress.position % 60)}s`, 'info');
         }, { once: true });
       }
       
-      // Démarrer la lecture
+      // Start playback
       video.play().catch(e => {
-        console.error('Erreur lecture:', e);
-        showNotification('Cliquez sur ▶️ pour lancer la lecture', 'info');
+        console.error('Playback error:', e);
+        showNotification('Click ▶️ to start playback', 'info');
       });
       
-      // Retourner à l'onglet Live pour voir le lecteur
+      // Return to Live tab to see player
       switchTab('live');
       
-      showNotification('Chargement de la rediffusion...', 'info');
+      showNotification('Loading replay...', 'info');
     }
-    // Exposer globalement pour l'utiliser depuis les boutons HTML
+    // Expose globally to use from HTML buttons
     window.playRecording = playRecording;
     
-    // Supprimer un enregistrement
+    // Delete a recording
     async function deleteRecording(filename) {
-      if (!confirm('Supprimer cet enregistrement ?')) return;
+      if (!confirm('Delete this recording?')) return;
       try {
         const res = await fetch(`/api/recordings/${username}/${filename}`, { method: 'DELETE' });
         if (res.ok) {
-          showNotification('Enregistrement supprimé', 'success');
+          showNotification('Recording deleted', 'success');
           const key = `watch_progress_${username}_${filename}`;
           localStorage.removeItem(key);
           loadRecordings();
         } else {
-          showNotification('Erreur lors de la suppression', 'error');
+          showNotification('Error deleting', 'error');
         }
       } catch (e) {
-        console.error('Erreur suppression:', e);
-        showNotification('Erreur lors de la suppression', 'error');
+        console.error('Delete error:', e);
+        showNotification('Error deleting', 'error');
       }
     }
-    // Exposer globalement
+    // Expose globally
     window.deleteRecording = deleteRecording;
 
-    // Supprimer le modèle
+    // Delete model
     async function deleteModel() {
-      if (!confirm(`Voulez-vous vraiment supprimer ${username} de votre liste ?`)) {
+      if (!confirm(`Really delete ${username} from your list?`)) {
         return;
       }
       
@@ -1263,14 +1263,14 @@
         });
         
         if (res.ok) {
-          showNotification('Modèle supprimé');
+          showNotification('Model deleted');
           setTimeout(() => window.location.href = '/', 1000);
         } else {
-          showNotification('Erreur lors de la suppression', 'error');
+          showNotification('Error deleting', 'error');
         }
       } catch (e) {
-        console.error('Erreur suppression modèle:', e);
-        showNotification('Erreur de connexion', 'error');
+        console.error('Model delete error:', e);
+        showNotification('Connection error', 'error');
       }
     }
 
@@ -1295,7 +1295,7 @@
       setTimeout(() => notif.remove(), 3000);
     }
 
-    // Démarrage automatique de l'enregistrement si en ligne
+    // Auto-start recording if online
     async function autoStartRecording() {
       try {
         const statusRes = await fetch(`/api/model/${username}/status`);
@@ -1303,29 +1303,29 @@
         
         const modelInfo = await statusRes.json();
         
-        // Si le modèle est en ligne
+        // If model is online
         if (modelInfo.isOnline) {
-          // Vérifier s'il n'y a pas déjà une session
+          // Check if there's already a session
           const sessionsRes = await fetch('/api/status');
           const sessions = await sessionsRes.json();
           const existingSession = sessions.find(s => s.person === username && s.running);
           
-          // Si pas de session, démarrer automatiquement
+          // If no session, start automatically
           if (!existingSession) {
-            console.log(`🎬 Démarrage automatique de l'enregistrement pour ${username}`);
+            console.log(`🎬 Auto-starting recording for ${username}`);
             await toggleRecording();
           } else {
-            console.log(`⏭️ Session déjà en cours pour ${username}, chargement du stream...`);
-            // La session existe déjà, on va juste charger le stream
+            console.log(`⏭️ Session already running for ${username}, loading stream...`);
+            // Session already exists, just load the stream
             await updateModelStatus();
           }
         }
       } catch (e) {
-        console.error('Erreur auto-start:', e);
+        console.error('Auto-start error:', e);
       }
     }
 
-    // Sauvegarder la progression toutes les 10 secondes
+    // Save progress every 10 seconds
     const video = document.getElementById('player');
     setInterval(() => {
       if (currentRecordingFile && video.currentTime > 0 && video.duration > 0) {
@@ -1333,7 +1333,7 @@
       }
     }, 10000);
     
-    // Sauvegarder aussi à la pause ou en quittant la page
+    // Also save on pause or leaving page
     video.addEventListener('pause', () => {
       if (currentRecordingFile && video.currentTime > 0 && video.duration > 0) {
         saveWatchProgress(currentRecordingFile, video.currentTime, video.duration);
@@ -1346,17 +1346,17 @@
       }
     });
 
-    // Initialisation
+    // Initialization
     updateModelStatus();
     loadRecordings();
     
-    // Démarrer automatiquement l'enregistrement après un court délai
+    // Auto-start recording after short delay
     setTimeout(autoStartRecording, 2000);
     
-    // Rafraîchir toutes les 10 secondes (moins agressif)
+    // Refresh every 10 seconds (less aggressive)
     setInterval(updateModelStatus, 10000);
     
-    } // Fin de initializePage()
+    } // End of initializePage()
   </script>
   
   <div id="footer-placeholder"></div>

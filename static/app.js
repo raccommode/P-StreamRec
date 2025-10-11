@@ -1,8 +1,8 @@
 // ============================================
-// Cache pour performance instantanée
+// Cache for instant performance
 // ============================================
 
-// Sauvegarder le cache des modèles
+// Save models cache
 function saveModelsCache(models) {
   localStorage.setItem('models_cache', JSON.stringify({
     models,
@@ -10,12 +10,12 @@ function saveModelsCache(models) {
   }));
 }
 
-// Récupérer le cache des modèles
+// Get models cache
 function getModelsCache() {
   const cached = localStorage.getItem('models_cache');
   if (cached) {
     const data = JSON.parse(cached);
-    // Cache valide pendant 5 minutes
+    // Cache valid for 5 minutes
     if (Date.now() - data.timestamp < 300000) {
       return data.models;
     }
@@ -23,7 +23,7 @@ function getModelsCache() {
   return null;
 }
 
-// Sauvegarder les infos des modèles
+// Save model info
 function saveModelInfoCache(username, info) {
   const key = `model_info_${username}`;
   localStorage.setItem(key, JSON.stringify({
@@ -32,13 +32,13 @@ function saveModelInfoCache(username, info) {
   }));
 }
 
-// Récupérer les infos en cache
+// Get cached info
 function getModelInfoCache(username) {
   const key = `model_info_${username}`;
   const cached = localStorage.getItem(key);
   if (cached) {
     const data = JSON.parse(cached);
-    // Cache valide pendant 30 secondes
+    // Cache valid for 30 seconds
     if (Date.now() - data.timestamp < 30000) {
       return data;
     }
@@ -46,32 +46,32 @@ function getModelInfoCache(username) {
   return null;
 }
 
-// Charger les modèles depuis le serveur
+// Load models from server
 async function getModels() {
   try {
     const res = await fetch('/api/models');
     if (res.ok) {
       const data = await res.json();
       const models = data.models || [];
-      saveModelsCache(models); // Sauvegarder en cache
+      saveModelsCache(models); // Save to cache
       return models;
     }
   } catch (e) {
-    console.error('Erreur chargement modèles:', e);
+    console.error('Error loading models:', e);
   }
   return [];
 }
 
-// Extraire le username depuis une URL Chaturbate
+// Extract username from Chaturbate URL
 function extractUsername(url) {
   if (!url) return null;
   
-  // Si c'est juste un username
+  // If it's just a username
   if (!url.includes('/') && !url.includes('.')) {
     return url.toLowerCase().trim();
   }
   
-  // Extraire depuis URL chaturbate.com/username
+  // Extract from chaturbate.com/username URL
   const match = url.match(/chaturbate\.com\/([a-zA-Z0-9_-]+)/);
   if (match) {
     return match[1].toLowerCase().trim();
@@ -97,7 +97,7 @@ function closeAddModal() {
 }
 
 // ============================================
-// Ajouter un modèle
+// Add a model
 // ============================================
 
 async function addModel(event) {
@@ -125,45 +125,45 @@ async function addModel(event) {
         addedAt: new Date().toISOString(),
         recordQuality: quality,
         retentionDays: retentionDays,
-        autoRecord: true  // Par défaut activé
+        autoRecord: true  // Enabled by default
       })
     });
     
     if (res.status === 409) {
-      showNotification('Ce modèle est déjà dans la liste', 'error');
+      showNotification('This model is already in the list', 'error');
       return;
     }
     
     if (!res.ok) {
-      showNotification('Erreur lors de l\'ajout', 'error');
+      showNotification('Error adding model', 'error');
       return;
     }
     
     closeAddModal();
-    showNotification(`${username} ajouté avec succès!`, 'success');
+    showNotification(`${username} added successfully!`, 'success');
     
-    // Vider le cache pour forcer un rechargement depuis le serveur
+    // Clear cache to force reload from server
     localStorage.removeItem('dashboard_cache');
     localStorage.removeItem('models_cache');
     
     renderModels();
   } catch (e) {
-    console.error('Erreur ajout modèle:', e);
-    showNotification('Erreur de connexion', 'error');
+    console.error('Error adding model:', e);
+    showNotification('Connection error', 'error');
   }
 }
 
 // ============================================
-// Récupérer les informations d'un modèle
+// Get model information
 // ============================================
 
 async function getModelInfo(username, useCache = true) {
-  // Essayer le cache d'abord pour l'affichage instantané
+  // Try cache first for instant display
   if (useCache) {
     const cached = getModelInfoCache(username);
     if (cached) {
-      // Retourner le cache immédiatement
-      // et mettre à jour en arrière-plan
+      // Return cache immediately
+      // and update in background
       getModelInfo(username, false).then(freshData => {
         saveModelInfoCache(username, freshData);
       });
@@ -172,7 +172,7 @@ async function getModelInfo(username, useCache = true) {
   }
   
   try {
-    // Utiliser notre API backend pour éviter les problèmes CORS
+    // Use our backend API to avoid CORS issues
     const response = await fetch(`/api/model/${username}/status`);
     if (response.ok) {
       const data = await response.json();
@@ -186,7 +186,7 @@ async function getModelInfo(username, useCache = true) {
       return info;
     }
   } catch (e) {
-    console.error(`Erreur récupération infos ${username}:`, e);
+    console.error(`Error fetching info for ${username}:`, e);
   }
   
   // Fallback: utiliser l'image par défaut
@@ -201,16 +201,16 @@ async function getModelInfo(username, useCache = true) {
 }
 
 // ============================================
-// Afficher les modèles
+// Display models
 // ============================================
 
-// Charger TOUTES les données d'un coup depuis le backend optimisé
+// Load ALL data at once from optimized backend
 async function getDashboardData() {
   try {
     const res = await fetch('/api/dashboard');
     if (res.ok) {
       const data = await res.json();
-      // Sauvegarder en cache
+      // Save to cache
       localStorage.setItem('dashboard_cache', JSON.stringify({
         ...data,
         cachedAt: Date.now()
@@ -221,11 +221,11 @@ async function getDashboardData() {
     console.error('Error loading dashboard:', e);
   }
   
-  // Fallback sur le cache
+  // Fallback to cache
   const cached = localStorage.getItem('dashboard_cache');
   if (cached) {
     const data = JSON.parse(cached);
-    // Cache valide pendant 1 minute
+    // Cache valid for 1 minute
     if (Date.now() - data.cachedAt < 60000) {
       return data;
     }
@@ -234,10 +234,10 @@ async function getDashboardData() {
   return { models: [], sessions: [] };
 }
 
-// Mise à jour dynamique des statuts sans recréer les cartes
+// Dynamic status update without recreating cards
 async function updateModelsStatus() {
   try {
-    // UNE SEULE requête pour tout !
+    // ONE single request for everything!
     const dashboardData = await getDashboardData();
     const models = dashboardData.models || [];
     const sessions = dashboardData.sessions || [];
@@ -248,15 +248,15 @@ async function updateModelsStatus() {
     
     for (const modelInfo of models) {
       const card = document.querySelector(`.model-card[data-username="${modelInfo.username}"]`);
-      if (!card) continue; // Carte pas encore créée
+      if (!card) continue; // Card not yet created
       
       const isRecording = modelInfo.isRecording;
       const isLive = isRecording || modelInfo.isOnline;
       
-      // Mettre à jour le statut de la carte
+      // Update card status
       card.className = `model-card ${isRecording ? 'recording' : modelInfo.isOnline ? 'online' : 'offline'}`;
       
-      // Mettre à jour les badges
+      // Update badges
       const existingBadges = card.querySelectorAll('.badge');
       existingBadges.forEach(b => b.remove());
       
@@ -272,7 +272,7 @@ async function updateModelsStatus() {
         card.insertBefore(badge, card.firstChild);
       }
       
-      // Ajouter pastille nombre de rediffusions
+      // Add replays count badge
       if (modelInfo.recordingsCount > 0) {
         const recBadge = document.createElement('div');
         recBadge.className = 'badge recordings-count';
@@ -281,7 +281,7 @@ async function updateModelsStatus() {
         card.insertBefore(recBadge, card.firstChild);
       }
       
-      // Mettre à jour le texte de statut
+      // Update status text
       const statusDiv = card.querySelector('.model-status');
       if (statusDiv) {
         statusDiv.innerHTML = `
@@ -291,31 +291,31 @@ async function updateModelsStatus() {
         `;
       }
       
-      // Mettre à jour la miniature
+      // Update thumbnail
       const thumbnail = card.querySelector('.model-thumbnail');
       if (thumbnail) {
         if (isLive) {
-          // Live/Recording : Couleur + rafraîchir la miniature depuis le stream
+          // Live/Recording: Color + refresh thumbnail from stream
           thumbnail.style.filter = 'none';
           thumbnail.src = `/api/thumbnail/${modelInfo.username}?t=${Date.now()}`;
         } else {
-          // Offline : Noir et blanc (garde la miniature de la dernière rediffusion en cache)
+          // Offline: Black and white (keep last replay thumbnail in cache)
           thumbnail.style.filter = 'grayscale(100%) brightness(0.7)';
-          // Ne pas changer l'URL pour garder la miniature générée en cache
+          // Don't change URL to keep cached generated thumbnail
           if (!thumbnail.src.includes('/api/thumbnail/')) {
             thumbnail.src = `/api/thumbnail/${modelInfo.username}`;
           }
         }
       }
       
-      // DÉPLACER les cartes LIVE dans la section LIVE
+      // MOVE LIVE cards to LIVE section
       if (isLive) {
         liveCount++;
         if (card.parentElement !== liveGrid) {
           liveGrid.appendChild(card);
         }
       } else {
-        // Remettre dans la section All Models si pas live
+        // Move back to All Models section if not live
         const allGrid = document.getElementById('allGrid');
         if (allGrid && card.parentElement !== allGrid) {
           allGrid.appendChild(card);
@@ -323,7 +323,7 @@ async function updateModelsStatus() {
       }
     }
     
-    // Afficher/masquer la section LIVE selon le nombre
+    // Show/hide LIVE section based on count
     if (liveSection) {
       liveSection.style.display = liveCount > 0 ? 'block' : 'none';
     }
@@ -336,7 +336,7 @@ async function renderModels() {
   const grid = document.getElementById('modelsGrid');
   const emptyState = document.getElementById('emptyState');
   
-  // Essayer le cache dashboard pour affichage instantané
+  // Try dashboard cache for instant display
   const cached = localStorage.getItem('dashboard_cache');
   let models = [];
   
@@ -349,7 +349,7 @@ async function renderModels() {
     } catch (e) {}
   }
   
-  // Afficher immédiatement le cache si disponible
+  // Display cache immediately if available
   if (models.length > 0) {
     emptyState.style.display = 'none';
     grid.innerHTML = '';
@@ -358,7 +358,7 @@ async function renderModels() {
     const liveSection = document.createElement('div');
     liveSection.id = 'liveSection';
     liveSection.style.cssText = 'grid-column: 1 / -1; display: none; margin-bottom: 2rem;';
-    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> En Direct</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> Live Now</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(liveSection);
     
     // Section ALL MODELS
@@ -368,7 +368,7 @@ async function renderModels() {
     allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> All Models</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(allSection);
     
-    // Créer les cartes IMMÉDIATEMENT avec les données du cache
+    // Create cards IMMEDIATELY with cached data
     for (const modelInfo of models) {
       const card = document.createElement('div');
       card.className = 'model-card offline';
@@ -395,7 +395,7 @@ async function renderModels() {
         </div>
       `;
       
-      // Ajouter dans la section All Models par défaut
+      // Add to All Models section by default
       const allGrid = document.getElementById('allGrid');
       if (allGrid) {
         allGrid.appendChild(card);
@@ -405,7 +405,7 @@ async function renderModels() {
     }
   }
   
-  // Charger les vraies données en arrière-plan
+  // Load real data in background
   const dashboardData = await getDashboardData();
   const freshModels = dashboardData.models || [];
   
@@ -415,7 +415,7 @@ async function renderModels() {
     return;
   }
   
-  // Si pas de cache, afficher maintenant
+  // If no cache, display now
   if (models.length === 0) {
     emptyState.style.display = 'none';
     grid.innerHTML = '';
@@ -423,13 +423,13 @@ async function renderModels() {
     const liveSection = document.createElement('div');
     liveSection.id = 'liveSection';
     liveSection.style.cssText = 'grid-column: 1 / -1; display: none; margin-bottom: 2rem;';
-    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> En Direct</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    liveSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #ef4444; font-size: 1.2rem;">🔴</span> Live Now</h2><div id="liveGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(liveSection);
     
     const allSection = document.createElement('div');
     allSection.id = 'allSection';
     allSection.style.cssText = 'grid-column: 1 / -1;';
-    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> Tous les Modèles</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> All Models</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(allSection);
     
     for (const modelInfo of freshModels) {
@@ -458,7 +458,7 @@ async function renderModels() {
         </div>
       `;
       
-      // Ajouter dans la section All Models
+      // Add to All Models section
       const allGrid = document.getElementById('allGrid');
       if (allGrid) {
         allGrid.appendChild(card);
@@ -468,12 +468,12 @@ async function renderModels() {
     }
   }
   
-  // Mettre à jour avec les vraies données (juste les badges et positions)
+  // Update with real data (just badges and positions)
   updateModelsStatus();
 }
 
 // ============================================
-// Récupérer les sessions actives
+// Get active sessions
 // ============================================
 
 async function getActiveSessions() {
@@ -483,17 +483,17 @@ async function getActiveSessions() {
       return await res.json();
     }
   } catch (e) {
-    console.error('Erreur récupération sessions:', e);
+    console.error('Error fetching sessions:', e);
   }
   return [];
 }
 
 // ============================================
-// Ouvrir la page d'un modèle
+// Open model page
 // ============================================
 
 function openModelPage(username) {
-  // Créer une nouvelle page ou rediriger
+  // Create a new page or redirect
   window.location.href = `/model.html?username=${username}`;
 }
 
@@ -527,7 +527,7 @@ function showNotification(message, type = 'success') {
 }
 
 // ============================================
-// Démarrage automatique des enregistrements
+// Automatic recording start
 // ============================================
 
 async function checkAndStartRecordings() {
@@ -540,11 +540,11 @@ async function checkAndStartRecordings() {
     const isRecording = session && session.running;
     
     if (!isRecording) {
-      // Vérifier si le modèle est en ligne
+      // Check if model is online
       const info = await getModelInfo(username);
       if (info.isOnline) {
-        // Démarrer l'enregistrement automatiquement
-        console.log(`🔴 ${username} est en ligne, démarrage automatique...`);
+        // Start recording automatically
+        console.log(`🔴 ${username} is online, starting automatically...`);
         try {
           const res = await fetch('/api/start', {
             method: 'POST',
@@ -558,18 +558,18 @@ async function checkAndStartRecordings() {
           });
           
           if (res.ok) {
-            console.log(`✅ Enregistrement démarré automatiquement pour ${username}`);
-            // Mettre à jour juste les statuts sans tout recharger
+            console.log(`✅ Recording started automatically for ${username}`);
+            // Update just statuses without reloading everything
             await updateModelsStatus();
           } else if (res.status === 409) {
-            // Session déjà en cours, c'est normal, on ignore
-            console.log(`⏭️ Session déjà en cours pour ${username}, skip`);
+            // Session already running, this is normal, skip
+            console.log(`⏭️ Session already running for ${username}, skip`);
           } else {
             const error = await res.json();
-            console.error(`❌ Erreur pour ${username}:`, error.detail);
+            console.error(`❌ Error for ${username}:`, error.detail);
           }
         } catch (e) {
-          console.error(`❌ Erreur démarrage ${username}:`, e);
+          console.error(`❌ Error starting ${username}:`, e);
         }
       }
     }
@@ -577,11 +577,11 @@ async function checkAndStartRecordings() {
 }
 
 // ============================================
-// Initialisation
+// Initialization
 // ============================================
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Ajouter les styles d'animation
+  // Add animation styles
   const style = document.createElement('style');
   style.textContent = `
     @keyframes slideIn {
@@ -595,17 +595,17 @@ window.addEventListener('DOMContentLoaded', () => {
   `;
   document.head.appendChild(style);
   
-  // Afficher les modèles
+  // Display models
   renderModels();
   
-  // Mettre à jour les statuts toutes les 15 secondes (rapide et dynamique)
+  // Update statuses every 15 seconds (fast and dynamic)
   setInterval(updateModelsStatus, 15000);
   
-  // Vérifier et démarrer les enregistrements toutes les 60 secondes
+  // Check and start recordings every 60 seconds
   setInterval(checkAndStartRecordings, 60000);
-  checkAndStartRecordings(); // Premier check immédiat
+  checkAndStartRecordings(); // First immediate check
   
-  // Fermer la modal en cliquant en dehors
+  // Close modal when clicking outside
   document.getElementById('addModal').addEventListener('click', (e) => {
     if (e.target.id === 'addModal') {
       closeAddModal();

@@ -410,7 +410,7 @@
 
   <div class="container">
     <div class="models-grid" id="modelsGrid">
-      <!-- Les cartes des modèles seront ajoutées ici par JavaScript -->
+      <!-- Model cards will be added here by JavaScript -->
     </div>
     
     <div class="empty-state" id="emptyState">
@@ -420,7 +420,7 @@
     </div>
   </div>
 
-  <!-- Modal pour ajouter un modèle -->
+  <!-- Modal to add a model -->
   <div class="modal" id="addModal">
     <div class="modal-content">
       <h2 class="modal-header">Add Chaturbate Model</h2>
@@ -514,7 +514,7 @@
   </div>
 
   <script>
-    // GitOps - Vérifier les mises à jour au démarrage
+    // GitOps - Check for updates at startup
     (async function checkGitStatus() {
       try {
         const res = await fetch('/api/git/status');
@@ -588,7 +588,7 @@
           showNotification(`Update applied! ${data.oldCommit} → ${data.newCommit}`, 'success');
           closeGitModal();
           
-          // Attendre le redémarrage puis recharger la page
+          // Wait for restart then reload page
           setTimeout(() => {
             window.location.reload();
           }, 3000);
