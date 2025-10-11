@@ -11,6 +11,7 @@
     "FIX: Conversion task now processes old recordings after restart",
     "FIX: Auto-detection of existing MP4 files",
     "FIX: Video always starts muted then unmutes to saved volume",
+    "FIX: Timestamps now include seconds",
     "IMPROVED: Recording naming system with timestamps",
     "IMPROVED: Database schema with MP4 fields",
     "IMPROVED: Frontend fully translated to English"
