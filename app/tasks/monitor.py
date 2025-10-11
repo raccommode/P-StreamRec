@@ -300,7 +300,6 @@ async def update_recordings_cache(db: 'Database', username: str, output_dir: Pat
             if not recording_id:
                 # Extraire le timestamp du nom de fichier (format: YYYYMMDD_HHMMSS_xxx.ts)
                 # Sinon générer un nouveau recording_id
-                from datetime import datetime
                 recording_id = f"{username}_{ts_file.stem}"
             
             await db.add_or_update_recording(
