@@ -1,6 +1,9 @@
 {
   "version": "2025.41.B",
   "changelog": [
+    "NEW: Add license badge",
+    "NEW: Add Docker badge",
+    "NEW: Add Open Source badge",
     "FIX: Footer version not displayed",
     "FIX: Translated to English"
   ]

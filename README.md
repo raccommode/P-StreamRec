@@ -1,32 +1,23 @@
 # P-StreamRec
 
-**Complete application for automatic recording of Chaturbate and m3u8 streams**
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-green.svg)](https://github.com/raccommode/P-StreamRec)
 
-All-in-one Docker container to watch and automatically record HLS/m3u8 streams, with a modern web interface.
+**Automatic recording of Chaturbate and m3u8 streams with a modern web interface**
 
 ![P-StreamRec Interface](screen.png)
 
-## Main Features
+## ✨ Features
 
-- **Automatic recording** of Chaturbate streams by username
-- **Modern web interface** to control recordings
-- **Automatic detection** when a user goes online
-- **Daily rotation** of files (1 TS file per day)
-- **Direct m3u8 URL support** for any type of stream
-- **Docker ready** with docker-compose for Portainer/Umbrel
-- **Background auto-recording** (no need to keep page open)
-- **Server-side storage** (works in private browsing)
-- **Multilingual** (French/English)
-- **GitOps updates** (one-click update from GitHub)
+- 🎥 **24/7 automatic recording** - Monitors and records when users go live
+- 🌐 **Web interface** - Manage recordings and watch replays in browser
+- 📦 **Docker ready** - One command to get started
+- 🔄 **GitOps updates** - Update directly from the interface
+- 🎯 **Chaturbate + m3u8 support** - Works with any HLS stream
+- 💾 **Smart storage** - Daily TS files, server-side persistence
 
-## Data Structure
-
-- **Recordings:** `/data/records/<person>/YYYY-MM-DD.ts`
-- **HLS streaming:** `/data/sessions/<session_id>/`
-- **Format:** MPEG-TS compatible with all players (VLC, MPV, etc.)
-- **Models list:** `/data/models.json` (server-side storage)
-
-## Configuration (Environment Variables)
+## ⚙️ Configuration (Environment Variables)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -40,9 +31,9 @@ All-in-one Docker container to watch and automatically record HLS/m3u8 streams, 
 | `AUTO_RECORD_USERS` | - | Comma-separated list of users to auto-record |
 | `TZ` | `UTC` | Timezone (e.g., `America/New_York`) |
 
-## Quick Start
+## 🚀 Quick Start
 
-### Option 1: Docker Run
+### Docker Run
 ```bash
 docker run -d \
   --name p-streamrec \
@@ -52,125 +43,66 @@ docker run -d \
   ghcr.io/raccommode/p-streamrec:latest
 ```
 
-### Option 2: Docker Compose (Portainer)
+### Docker Compose
 ```yaml
 version: "3.8"
 services:
   p-streamrec:
     image: ghcr.io/raccommode/p-streamrec:latest
-    container_name: p-streamrec
     ports:
       - "8080:8080"
     volumes:
       - ./data:/data
     environment:
       - CB_RESOLVER_ENABLED=true
-      - TZ=America/New_York
     restart: unless-stopped
 ```
 
-If error "failed to load the compose file":
-1. Verify that `docker-compose.yml` is present in the repo
-2. Check that "Compose path" = `docker-compose.yml`
-3. Check that branch = `main`
+### Portainer
+1. Go to **Stacks** → **Add stack** → **Git Repository**
+2. URL: `https://github.com/raccommode/P-StreamRec` | Branch: `main`
+3. Deploy
 
-## Usage
+**Access:** `http://localhost:8080`
 
-### Web Interface (http://localhost:8080)
+## 📖 Usage
 
-1. **Add a model:**
-   - Click the **+** button
-   - Enter a Chaturbate username (e.g., `username`)
-   - Or paste a direct m3u8 URL
-   - Click **Add**
+1. **Add a model**: Click **+** → Enter Chaturbate username or m3u8 URL
+2. **Auto-record**: System checks every 2 minutes and records when live
+3. **Watch replays**: Click model card → **Replays** tab
+4. **Update**: Click **GitOps** button in header to update app (Git deployment only)
 
-2. **Automatic recording:**
-   - Once a model is added, the system checks every 2 minutes
-   - When the model goes online, recording starts automatically
-   - No need to keep the page open!
+**Recordings:** `/data/records/<username>/YYYY-MM-DD.ts` (MPEG-TS format)
 
-3. **Watch replays:**
-   - Click on a model card
-   - Go to the **Replays** tab
-   - Click on a recording to watch
-   - Progress is automatically saved
+## 💻 Development
 
-4. **Manage models:**
-   - Click on a model card to view details
-   - Click the delete button to remove from list
-   - Models are saved server-side (works in private browsing)
-
-### Features
-
-#### Background Auto-Recording
-- The server checks every 2 minutes if your models are online
-- Automatically starts recording when they go online
-- Works 24/7 even if you close your browser
-- Logs available in Docker/Portainer
-
-#### Quality Selector
-- Automatically selects the highest quality available
-- Manual quality selection if multiple streams available
-- Options: Auto (best), 1080p, 720p, 480p, etc.
-
-#### Smart Caching
-- Replay metadata cached for fast loading
-- 30x faster on subsequent loads
-- Automatic cache invalidation when files change
-
-#### GitOps Updates
-- **One-click updates** directly from the web interface
-- Check for new versions from GitHub
-- Apply updates without SSH or command line
-- Automatic application restart after update
-- Perfect for Portainer/Docker deployments
-
-**How to use:**
-1. Look for the **GitOps** button in the header (appears only if in a Git repository)
-2. Click to see current version and available updates
-3. If updates are available, click **Apply Update**
-4. Application pulls latest changes and restarts automatically
-
-**Requirements:**
-- Application must be deployed as a Git clone
-- Git must be available in the container
-- Repository must have remote configured (origin)
-
-## Local Development
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-## Accessing Recordings
+## 📂 File Management
 
-Files are stored in `/data/records/<username>/YYYY-MM-DD.ts`
+**Play recordings:**
+- VLC/MPV: Open `.ts` files directly
+- Browser: Use Replays tab in web interface
 
-**To play TS files:**
-- **VLC:** Open file directly
-- **MPV:** `mpv /path/to/file.ts`
-- **FFmpeg convert to MP4:** 
-  ```bash
-  ffmpeg -i input.ts -c copy output.mp4
-  ```
+**Convert to MP4:**
+```bash
+ffmpeg -i input.ts -c copy output.mp4
+```
 
-## Important Notes
+## ⚠️ Notes
 
-- **Privacy respect:** Use only for public content
-- **Storage:** TS files can be large (~2-4 GB/hour)
-- **Bandwidth:** Each stream uses approximately 1-3 Mbps
-- **CPU:** Minimal usage (simple stream copy)
+- Storage: ~2-4 GB/hour per stream
+- Use only for public, legally accessible content
 
-## Version
+## 📜 License
 
-Current version: **2025.40.B**
+**Non-Commercial Open Source License** - See [LICENSE](LICENSE)
 
-See `version.json` for changelog and release information.
-
-## Legal Notice
-
-- Use this software in compliance with laws and service ToS
-- Does not bypass any technical protection measures
-- Ensure you have the right to record the content
-- Respect privacy and copyright laws
+✅ Free to use, modify, and distribute  
+❌ **No commercial use or revenue generation**  
+🔄 Share modifications under same license  
+📝 Attribution required
