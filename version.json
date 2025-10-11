@@ -1,6 +1,7 @@
 {
-  "version": "2025.41.A",
+  "version": "2025.41.B",
   "changelog": [
-    ""
+    "FIX: Footer version not displayed",
+    "FIX: Translated to English"
   ]
 }

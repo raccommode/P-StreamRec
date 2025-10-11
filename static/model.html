@@ -789,7 +789,7 @@
           console.log('🔄 Était déjà en enregistrement:', wasRecording);
           
           document.getElementById('statusDot').className = 'status-dot recording';
-          document.getElementById('statusText').textContent = 'En enregistrement';
+          document.getElementById('statusText').textContent = 'Recording';
           
           // Charger le stream UNIQUEMENT si ce n'était pas déjà en cours
           if (!wasRecording) {
@@ -801,11 +801,11 @@
         } else if (modelInfo.isOnline) {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot online';
-          document.getElementById('statusText').textContent = 'En ligne';
+          document.getElementById('statusText').textContent = 'Online';
         } else {
           currentSession = null;
           document.getElementById('statusDot').className = 'status-dot offline';
-          document.getElementById('statusText').textContent = 'Hors ligne';
+          document.getElementById('statusText').textContent = 'Offline';
         }
       } catch (e) {
         console.error('Erreur statut:', e);
@@ -1080,7 +1080,7 @@
         });
         
         if (recordings.length > 0) {
-          count.textContent = `${recordings.length} fichier${recordings.length > 1 ? 's' : ''}`;
+          count.textContent = `${recordings.length} File${recordings.length > 1 ? 's' : ''}`;
           
           list.innerHTML = recordings.map(rec => {
             const progress = getWatchProgress(rec.filename);
@@ -1137,11 +1137,11 @@
           list.innerHTML = `
             <div class="empty-message">
               <div class="icon">📂</div>
-              <p>Aucun enregistrement disponible</p>
-              <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Les enregistrements apparaîtront ici</p>
+              <p>No Recordings</p>
+              <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Recordings will appear here</p>
             </div>
           `;
-          count.textContent = '0 fichier';
+          count.textContent = '0 files';
         }
       } catch (e) {
         console.error('Erreur chargement enregistrements:', e);

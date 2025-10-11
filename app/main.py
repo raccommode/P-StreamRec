@@ -546,7 +546,7 @@ async def get_thumbnail(username: str):
         </defs>
         <rect fill="url(#grad)" width="280" height="200"/>
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="18" font-weight="600">{username}</text>
-        <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="12" opacity="0.8">📷 Chargement...</text>
+        <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="system-ui" font-size="12" opacity="0.8">📷 Loading...</text>
     </svg>'''
     
     return Response(

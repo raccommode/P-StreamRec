@@ -365,7 +365,7 @@ async function renderModels() {
     const allSection = document.createElement('div');
     allSection.id = 'allSection';
     allSection.style.cssText = 'grid-column: 1 / -1;';
-    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> Tous les Modèles</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
+    allSection.innerHTML = '<h2 style="color: var(--text-primary); font-size: 1.5rem; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;"><span style="color: #6366f1;">📁</span> All Models</h2><div id="allGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;"></div>';
     grid.appendChild(allSection);
     
     // Créer les cartes IMMÉDIATEMENT avec les données du cache
