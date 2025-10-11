@@ -98,17 +98,53 @@ async def auto_convert_recordings_task(db, output_dir: Path, ffmpeg_path: str = 
     """
     logger.info("🔄 Tâche de conversion automatique démarrée")
     
+    # SCAN INITIAL : Scanner tous les fichiers TS existants au démarrage
+    logger.info("📂 Scan initial des fichiers TS existants...")
+    try:
+        records_root = output_dir / "records"
+        if records_root.exists():
+            for user_dir in records_root.iterdir():
+                if user_dir.is_dir():
+                    username = user_dir.name
+                    for ts_file in user_dir.glob("*.ts"):
+                        # Vérifier si déjà dans la DB
+                        recordings = await db.get_recordings(username)
+                        existing = next((r for r in recordings if r['filename'] == ts_file.name), None)
+                        
+                        if not existing:
+                            # Ajouter à la DB
+                            logger.info("📥 Indexation fichier existant", username=username, file=ts_file.name)
+                            import time
+                            recording_id = f"{username}_{ts_file.stem}"
+                            await db.add_or_update_recording(
+                                username=username,
+                                filename=ts_file.name,
+                                file_path=str(ts_file),
+                                file_size=ts_file.stat().st_size,
+                                recording_id=recording_id,
+                                duration_seconds=0,
+                                is_converted=False
+                            )
+        logger.success("✅ Scan initial terminé")
+    except Exception as e:
+        logger.error("Erreur scan initial", error=str(e), exc_info=True)
+    
     while True:
         try:
             await asyncio.sleep(30)  # Vérifier toutes les 30 secondes
             
-            # Récupérer tous les modèles
-            models = await db.get_all_models()
-            
-            for model in models:
-                username = model['username']
+            # Scanner TOUS les dossiers users dans /records (pas seulement les modèles connus)
+            records_root = output_dir / "records"
+            if not records_root.exists():
+                continue
                 
-                # Récupérer les enregistrements non convertis
+            for user_dir in records_root.iterdir():
+                if not user_dir.is_dir():
+                    continue
+                    
+                username = user_dir.name
+                
+                # Récupérer les enregistrements non convertis depuis la DB
                 recordings = await db.get_recordings(username)
                 
                 for rec in recordings:
@@ -119,22 +155,42 @@ async def auto_convert_recordings_task(db, output_dir: Path, ffmpeg_path: str = 
                     # Vérifier si l'enregistrement est en cours
                     ts_path = Path(rec['file_path'])
                     
-                    # Vérifier si le fichier TS est stable (pas modifié depuis 60s)
-                    import time
+                    # Vérifier si le fichier TS existe
                     if not ts_path.exists():
+                        logger.warning("Fichier TS introuvable, skip", file=str(ts_path))
                         continue
                     
+                    # Vérifier si le MP4 existe déjà (éviter reconversion)
+                    mp4_path = ts_path.with_suffix('.mp4')
+                    if mp4_path.exists():
+                        # Le MP4 existe, mettre à jour la DB
+                        logger.info("MP4 déjà existant, mise à jour DB", file=mp4_path.name)
+                        await db.add_or_update_recording(
+                            username=username,
+                            filename=rec['filename'],
+                            file_path=rec['file_path'],
+                            file_size=rec['file_size'],
+                            recording_id=rec.get('recording_id'),
+                            duration_seconds=rec.get('duration_seconds', 0),
+                            thumbnail_path=rec.get('thumbnail_path'),
+                            mp4_path=str(mp4_path),
+                            mp4_size=mp4_path.stat().st_size,
+                            is_converted=True
+                        )
+                        continue
+                    
+                    # Vérifier si le fichier TS est stable (pas modifié depuis 60s)
+                    import time
                     last_modified = ts_path.stat().st_mtime
                     if time.time() - last_modified < 60:
                         # Fichier encore en cours d'écriture
+                        logger.debug("Fichier en cours d'écriture, skip", file=ts_path.name)
                         continue
                     
                     # Lancer la conversion
                     logger.info("🎬 Conversion automatique",
                               username=username,
                               filename=rec['filename'])
-                    
-                    mp4_path = ts_path.with_suffix('.mp4')
                     success, mp4_path_result, mp4_size = await convert_ts_to_mp4(
                         ts_path,
                         mp4_path,
