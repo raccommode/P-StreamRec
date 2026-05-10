@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recordings - P-StreamRec</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="/static/loader.js"></script>
+  <script defer src="/static/recordings.js?v=4"></script>
+  <style>
+    /* --- Per-model edit panel --- */
+    .model-edit-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem 1rem;
+      align-items: end;
+      padding: 1rem 1.25rem;
+      margin: 0 0 1rem 0;
+      background: rgba(26, 31, 58, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+    }
+    .model-edit-panel .field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .model-edit-panel label {
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #a0aec0;
+    }
+    .model-edit-panel select,
+    .model-edit-panel input {
+      background: #0f1330;
+      color: #e8ecff;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .model-edit-panel select:focus,
+    .model-edit-panel input:focus { border-color: #6366f1; }
+    .model-edit-panel .effective-hint {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 0.15rem;
+      min-height: 1em;
+    }
+    .model-edit-panel .effective-hint.capped { color: #fbbf24; }
+    .model-edit-panel .actions { display: flex; gap: 0.5rem; }
+    .model-edit-panel .save-btn {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .model-edit-panel .save-btn:hover { filter: brightness(1.1); }
+    .model-edit-panel .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- 7-day timeline --- */
+    .timeline-wrap {
+      padding: 1rem 1.25rem 1.25rem;
+      margin: 0 0 1rem 0;
+      background: rgba(26, 31, 58, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+    }
+    .timeline-title {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin: 0 0 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .timeline-title .hint { color: #64748b; font-weight: 400; font-size: 0.72rem; }
+    .timeline-grid {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      row-gap: 6px;
+      column-gap: 10px;
+      align-items: center;
+    }
+    .timeline-day-label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-align: right;
+      line-height: 1.1;
+    }
+    .timeline-day-label .dow { display: block; font-weight: 600; color: #e2e8f0; }
+    .timeline-day-label.today .dow { color: #f87171; }
+    .timeline-bar {
+      position: relative;
+      height: 22px;
+      background: linear-gradient(180deg, #0d1230, #0a0e25);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .timeline-rec {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      background: linear-gradient(180deg, #34d399, #059669);
+      border-radius: 3px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+      cursor: pointer;
+    }
+    .timeline-rec:hover { filter: brightness(1.2); }
+    .timeline-now {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      width: 2px;
+      background: #ef4444;
+      box-shadow: 0 0 6px #ef4444, 0 0 12px rgba(239,68,68,0.6);
+      animation: timeline-blink 1s infinite;
+      pointer-events: none;
+      z-index: 2;
+    }
+    @keyframes timeline-blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.25; }
+    }
+    .timeline-hours {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      column-gap: 10px;
+      margin-top: 0.5rem;
+      font-size: 0.65rem;
+      color: #64748b;
+    }
+    .timeline-hours .ticks {
+      position: relative;
+      height: 12px;
+    }
+    .timeline-hours .tick {
+      position: absolute;
+      transform: translateX(-50%);
+    }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <div class="container">
+    <!-- Stats bar -->
+    <div class="recordings-stats" id="recordingsStats">
+      <div class="stat-card">
+        <div class="stat-value" id="totalRecordings">-</div>
+        <div class="stat-label">Total Recordings</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalSize">-</div>
+        <div class="stat-label">Total Size</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalModels">-</div>
+        <div class="stat-label">Models</div>
+      </div>
+    </div>
+
+    <!-- Model Cards Grid (default view) -->
+    <div class="recordings-model-grid" id="modelGrid">
+      <div class="empty-message" id="loadingState">
+        <div class="icon">&#9203;</div>
+        <p>Loading recordings...</p>
+      </div>
+    </div>
+
+    <!-- Recording Detail View (shown when a model card is clicked) -->
+    <div class="recordings-detail" id="recordingsDetail" style="display: none;">
+      <div class="detail-header">
+        <button class="back-btn" onclick="showModelGrid()">&#8592; Back to Models</button>
+        <h2 class="detail-username" id="detailUsername">Model</h2>
+        <span class="detail-count" id="detailCount">0 recordings</span>
+        <button class="watch-btn record-btn" id="detailRecordBtn" onclick="toggleDetailAutoRecord()" style="margin-left: auto;">
+          <span id="detailRecordIcon">&#9675;</span>
+          <span id="detailRecordText">Auto-Record</span>
+        </button>
+      </div>
+
+      <!-- Per-model settings -->
+      <div class="model-edit-panel" id="modelEditPanel">
+        <div class="field">
+          <label for="editQuality">Recording Resolution</label>
+          <select id="editQuality">
+            <option value="best">Best available</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+          </select>
+          <span class="effective-hint" id="effectiveQualityHint"></span>
+        </div>
+        <div class="field">
+          <label for="editRetention">Retention (days)</label>
+          <input type="number" id="editRetention" min="1" max="365" step="1" />
+        </div>
+        <div class="field">
+          <label for="editAutoRecord">Auto-Record</label>
+          <select id="editAutoRecord">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="save-btn" id="saveModelBtn" onclick="saveModelSettings()">Save Changes</button>
+        </div>
+      </div>
+
+      <!-- 7-day activity timeline -->
+      <div class="timeline-wrap" id="timelineWrap">
+        <div class="timeline-title">
+          <span>Last 7 days &mdash; recording activity</span>
+          <span class="hint">green = recorded &middot; red = now</span>
+        </div>
+        <div class="timeline-grid" id="timelineGrid"></div>
+        <div class="timeline-hours">
+          <div></div>
+          <div class="ticks" id="timelineTicks"></div>
+        </div>
+      </div>
+
+      <div class="recordings-list" id="recordingsList"></div>
+    </div>
+
+    <!-- Player Modal -->
+    <div class="player-modal" id="playerModal" style="display: none;">
+      <div class="player-modal-content">
+        <div class="player-modal-header">
+          <h3 id="playerTitle">Playing</h3>
+          <button class="player-close-btn" onclick="closePlayer()">&times;</button>
+        </div>
+        <button class="player-floating-close" onclick="closePlayer()" aria-label="Close player">&times;</button>
+        <video id="recordingPlayer" class="recording-video" controls></video>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-message" id="emptyRecordings" style="display: none;">
+      <div class="icon">&#127910;</div>
+      <p>No recordings found</p>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+</body>
+</html>
