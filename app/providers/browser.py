@@ -1134,7 +1134,9 @@ class BrowserCaptureProvider(BaseProvider):
                     "total_pages": 1,
                 }
 
-            request_limit = min(max(limit, 24), 100)
+            # Stripchat currently rejects values above 50 even though callers
+            # may request larger catalogue pages.
+            request_limit = min(max(limit, 24), 50)
             payload = await self._stripchat_api_json(
                 "GET",
                 "/v2/models",
@@ -1970,31 +1972,36 @@ class BrowserCaptureProvider(BaseProvider):
             raise ProviderOfflineError(f"Modele Stripchat introuvable ou hors ligne: {username}")
 
         self._validate_stripchat_public_stream(payload, model, username)
-        model_id = self._stripchat_model_id(model)
-        if not model_id:
+        stream_name = self._stripchat_stream_name(payload, model)
+        if not stream_name:
             raise ProviderOfflineError(f"Flux Stripchat introuvable: {username}")
 
         headers = self._stream_headers(page_url, await self._provider_cookie_header())
         hosts = self._stripchat_hls_hosts_from_payload(payload) or list(STRIPCHAT_HLS_HOSTS)
+        is_vr = self._stripchat_is_vr(payload, model)
         for host in hosts:
-            playlist_url = (
-                f"https://edge-hls.{host}/hls/{model_id}/master/{model_id}_auto.m3u8"
-                f"{self._stripchat_master_playlist_query()}"
-            )
-            stream_url = await self._stripchat_validated_hls_url(playlist_url, headers, max_height)
-            if stream_url:
-                item = self._stripchat_model_item(model) or {}
-                return ResolvedStream(
-                    url=stream_url,
-                    headers=headers,
-                    source_type=self.source_type,
-                    is_live=True,
-                    room_status="public",
-                    viewers=int(item.get("viewers") or 0),
-                    tags=list(item.get("tags") or []),
-                    thumbnail=item.get("thumbnail") or None,
-                    title=str(item.get("display_name") or username),
-                )
+            playlist_urls = []
+            if is_vr:
+                playlist_urls.append(self._stripchat_master_playlist_url(host, stream_name, vr=True))
+            playlist_urls.append(self._stripchat_master_playlist_url(host, stream_name))
+            for playlist_url in playlist_urls:
+                stream_url = await self._stripchat_validated_hls_url(playlist_url, headers, max_height)
+                if stream_url:
+                    item = self._stripchat_model_item(model) or {}
+                    tags = list(item.get("tags") or [])
+                    if is_vr and "vr" not in tags:
+                        tags.append("vr")
+                    return ResolvedStream(
+                        url=stream_url,
+                        headers=headers,
+                        source_type=self.source_type,
+                        is_live=True,
+                        room_status="public",
+                        viewers=int(item.get("viewers") or 0),
+                        tags=tags,
+                        thumbnail=item.get("thumbnail") or None,
+                        title=str(item.get("display_name") or username),
+                    )
 
         raise ProviderOfflineError(f"Aucun HLS Stripchat public valide pour {username}")
 
@@ -2022,23 +2029,25 @@ class BrowserCaptureProvider(BaseProvider):
             return None
 
         variants: list[dict[str, object]] = []
-        pending_height = 0
+        pending_quality_height = 0
         for raw_line in (playlist_text or "").splitlines():
             line = raw_line.strip()
             if not line:
                 continue
             if line.startswith("#EXT-X-STREAM-INF"):
-                match = re.search(r"RESOLUTION=\d+x(\d+)", line, re.IGNORECASE)
-                pending_height = int(match.group(1)) if match else 0
+                match = re.search(r"RESOLUTION=(\d+)x(\d+)", line, re.IGNORECASE)
+                pending_quality_height = min(int(match.group(1)), int(match.group(2))) if match else 0
                 continue
             if line.startswith("#"):
                 continue
-            if pending_height:
+            if pending_quality_height:
                 variants.append({
-                    "height": pending_height,
+                    # Quality settings refer to the shorter picture dimension:
+                    # 720p is 1280x720 in landscape and 720x960 in portrait.
+                    "height": pending_quality_height,
                     "url": urljoin(playlist_url, line),
                 })
-            pending_height = 0
+            pending_quality_height = 0
 
         if not variants:
             return None
@@ -2195,6 +2204,42 @@ class BrowserCaptureProvider(BaseProvider):
 
     def _stripchat_model_id(self, model: dict[str, object]) -> str:
         return str(model.get("id") or model.get("streamName") or "").strip()
+
+    def _stripchat_stream_name(
+        self,
+        payload: object,
+        model: dict[str, object],
+    ) -> str:
+        cam = payload.get("cam") if isinstance(payload, dict) and isinstance(payload.get("cam"), dict) else {}
+        return str(cam.get("streamName") or model.get("streamName") or self._stripchat_model_id(model)).strip()
+
+    def _stripchat_is_vr(
+        self,
+        payload: object,
+        model: dict[str, object],
+    ) -> bool:
+        cam = payload.get("cam") if isinstance(payload, dict) and isinstance(payload.get("cam"), dict) else {}
+        broadcast_settings = cam.get("broadcastSettings") if isinstance(cam.get("broadcastSettings"), dict) else {}
+        payload_settings = payload.get("broadcastSettings") if isinstance(payload, dict) and isinstance(payload.get("broadcastSettings"), dict) else {}
+        indicators = (
+            model.get("isVr"),
+            model.get("vr"),
+            cam.get("isVr"),
+            cam.get("vr"),
+            cam.get("vrCameraSettings"),
+            broadcast_settings.get("vrCameraSettings"),
+            payload_settings.get("vrCameraSettings"),
+        )
+        return any(self._stripchat_truthy_indicator(value) for value in indicators)
+
+    def _stripchat_master_playlist_url(self, host: str, stream_name: str, vr: bool = False) -> str:
+        if vr:
+            vr_name = f"{stream_name}_vr"
+            return f"https://edge-hls.{host}/hls/{vr_name}/master/{vr_name}.m3u8"
+        return (
+            f"https://edge-hls.{host}/hls/{stream_name}/master/{stream_name}_auto.m3u8"
+            f"{self._stripchat_master_playlist_query()}"
+        )
 
     def _stripchat_front_version(self) -> str:
         return (os.getenv("PSTREAMREC_STRIPCHAT_FRONT_VERSION") or STRIPCHAT_FRONT_VERSION).strip() or STRIPCHAT_FRONT_VERSION
@@ -2354,18 +2399,36 @@ class BrowserCaptureProvider(BaseProvider):
             "isaptcharequired",
             "iscaptcharequired",
         }
-        if isinstance(value, dict):
-            for key, child in value.items():
-                key_lower = str(key).lower()
-                if key_lower in challenge_keys and child not in (None, False, "", [], {}):
-                    return True
-                if self._stripchat_login_requires_interaction(child):
-                    return True
-        elif isinstance(value, list):
-            return any(self._stripchat_login_requires_interaction(child) for child in value)
-        elif isinstance(value, str):
-            return bool(_INTERACTION_RE.search(value))
-        return False
+        message_keys = {
+            "_raw",
+            "description",
+            "detail",
+            "error",
+            "errors",
+            "message",
+            "messages",
+            "reason",
+            "title",
+        }
+
+        def walk(child: object, inspect_text: bool = False) -> bool:
+            if isinstance(child, dict):
+                for key, nested in child.items():
+                    key_lower = str(key).lower()
+                    if key_lower in challenge_keys and nested not in (None, False, "", [], {}):
+                        return True
+                    if key_lower in message_keys and walk(nested, inspect_text=True):
+                        return True
+                    if isinstance(nested, (dict, list)) and walk(nested):
+                        return True
+                return False
+            if isinstance(child, list):
+                return any(walk(nested, inspect_text=inspect_text) for nested in child)
+            if isinstance(child, str):
+                return inspect_text and bool(_INTERACTION_RE.search(child))
+            return False
+
+        return walk(value, inspect_text=isinstance(value, str))
 
     def _stripchat_text_values(self, value: object) -> list[str]:
         values: list[str] = []

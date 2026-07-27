@@ -4,6 +4,7 @@ python-multipart==0.0.32
 uvicorn==0.51.0
 requests==2.34.2
 aiohttp==3.14.1
+Brotli==1.2.0
 aiohttp-socks==0.8.4
 PySocks==1.7.1
 pydantic==2.13.4

@@ -377,6 +377,7 @@ class ProviderRegistryTests(unittest.IsolatedAsyncioTestCase):
             result = await provider.list_live_models(page=1, limit=10, gender="female", search="", tags=[])
 
         api.assert_awaited_once()
+        self.assertEqual(24, api.await_args.kwargs["params"]["limit"])
         self.assertEqual(["alice"], [item["username"] for item in result["models"]])
         self.assertEqual(44, result["models"][0]["viewers"])
         self.assertEqual(1, result["total"])
@@ -400,6 +401,7 @@ class ProviderRegistryTests(unittest.IsolatedAsyncioTestCase):
                     "gender": "female",
                     "viewersCount": 77,
                     "snapshotTimestamp": "1700000000",
+                    "avatarUrl": "https://img.example.test/avatar-2fa9.jpg",
                 }
             },
             "cam": {
@@ -434,6 +436,23 @@ class ProviderRegistryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Referer", stream.headers)
         self.assertIn("Origin", stream.headers)
         self.assertIn("User-Agent", stream.headers)
+
+    def test_stripchat_avatar_url_does_not_trigger_interaction_detection(self):
+        provider = BrowserCaptureProvider(
+            source_type="stripchat",
+            display_name="Stripchat",
+            url_templates=("https://stripchat.com/{username}",),
+            domains=("stripchat.com",),
+        )
+
+        self.assertFalse(provider._stripchat_login_requires_interaction({
+            "user": {
+                "avatarUrl": "https://img.example.test/avatar-2fa9.jpg",
+            },
+        }))
+        self.assertTrue(provider._stripchat_login_requires_interaction({
+            "error": "2FA verification is required",
+        }))
 
     async def test_stripchat_public_api_caps_hls_manifest_to_configured_height(self):
         provider = BrowserCaptureProvider(
@@ -487,6 +506,131 @@ class ProviderRegistryTests(unittest.IsolatedAsyncioTestCase):
             "https://edge-hls.doppiocdn.net/hls/42/master/720p/index.m3u8",
             stream.url,
         )
+
+    async def test_stripchat_public_api_caps_portrait_manifest_by_short_edge(self):
+        playlist_url = "https://edge-hls.doppiocdn.net/hls/42/master/42_auto.m3u8"
+        master = "\n".join([
+            "#EXTM3U",
+            "#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=180x240",
+            "240p/index.m3u8",
+            "#EXT-X-STREAM-INF:BANDWIDTH=1800000,RESOLUTION=360x480",
+            "480p/index.m3u8",
+            "#EXT-X-STREAM-INF:BANDWIDTH=3500000,RESOLUTION=720x960",
+            "720p/index.m3u8",
+        ])
+
+        selected = BrowserCaptureProvider._stripchat_variant_url_for_height(
+            playlist_url,
+            master,
+            720,
+        )
+
+        self.assertEqual(
+            "https://edge-hls.doppiocdn.net/hls/42/master/720p/index.m3u8",
+            selected,
+        )
+
+    async def test_stripchat_public_api_uses_vr_manifest_when_available(self):
+        provider = BrowserCaptureProvider(
+            source_type="stripchat",
+            display_name="Stripchat",
+            url_templates=("https://stripchat.com/{username}",),
+            domains=("stripchat.com",),
+        )
+        payload = {
+            "user": {
+                "user": {
+                    "id": 42,
+                    "username": "alice",
+                    "status": "public",
+                    "isOnline": True,
+                    "isLive": True,
+                    "isVr": True,
+                }
+            },
+            "cam": {
+                "isCamAvailable": True,
+                "isCamActive": True,
+                "streamName": "vr42",
+                "streamStatus": "public",
+            },
+        }
+
+        with patch.object(
+            provider,
+            "_stripchat_api_json",
+            AsyncMock(return_value=payload),
+        ), patch.object(
+            provider,
+            "_stripchat_probe_hls_playlist",
+            AsyncMock(return_value=True),
+        ) as probe:
+            stream = await provider.resolve_stream("alice")
+
+        probe.assert_awaited_once()
+        self.assertEqual(
+            "https://edge-hls.doppiocdn.net/hls/vr42_vr/master/vr42_vr.m3u8",
+            stream.url,
+        )
+        self.assertIn("vr", stream.tags)
+
+    async def test_stripchat_public_api_falls_back_when_vr_manifest_is_unavailable(self):
+        provider = BrowserCaptureProvider(
+            source_type="stripchat",
+            display_name="Stripchat",
+            url_templates=("https://stripchat.com/{username}",),
+            domains=("stripchat.com",),
+        )
+        payload = {
+            "user": {
+                "user": {
+                    "id": 42,
+                    "username": "alice",
+                    "status": "public",
+                    "isOnline": True,
+                    "isLive": True,
+                    "isVr": True,
+                }
+            },
+            "cam": {
+                "isCamAvailable": True,
+                "isCamActive": True,
+                "streamName": "vr42",
+                "streamStatus": "public",
+            },
+        }
+
+        with patch.object(
+            provider,
+            "_stripchat_api_json",
+            AsyncMock(return_value=payload),
+        ), patch.object(
+            provider,
+            "_stripchat_probe_hls_playlist",
+            AsyncMock(side_effect=[False, True]),
+        ) as probe:
+            stream = await provider.resolve_stream("alice")
+
+        self.assertEqual(2, probe.await_count)
+        self.assertEqual(
+            "https://edge-hls.doppiocdn.net/hls/vr42/master/vr42_auto.m3u8?minHeight=240&playlistType=standard&pkey=fncnu6utiWqsDLk8",
+            stream.url,
+        )
+
+    async def test_stripchat_public_api_limits_catalogue_request_to_fifty(self):
+        provider = BrowserCaptureProvider(
+            source_type="stripchat",
+            display_name="Stripchat",
+            url_templates=("https://stripchat.com/{username}",),
+            domains=("stripchat.com",),
+            discover_templates=("https://stripchat.com/girls",),
+        )
+        api = AsyncMock(return_value={"models": [], "totalCount": 0})
+
+        with patch.object(provider, "_stripchat_api_json", api):
+            await provider.list_live_models(page=1, limit=100, gender=None, search="", tags=[])
+
+        self.assertEqual(50, api.await_args.kwargs["params"]["limit"])
 
     async def test_stripchat_public_resolver_rejects_offline_payload_without_hls_probe(self):
         provider = BrowserCaptureProvider(

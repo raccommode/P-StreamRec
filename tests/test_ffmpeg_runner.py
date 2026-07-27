@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from app.ffmpeg_runner import FFmpegSession, _build_ffmpeg_command
+from app.ffmpeg_runner import FFmpegManager, FFmpegSession, _build_ffmpeg_command
 
 
 class FFmpegCommandTests(unittest.TestCase):
@@ -191,6 +191,58 @@ class FFmpegFilenameTests(unittest.TestCase):
             )
 
         self.assertEqual("model_20260527-123456_part001.ts", session.record_filename)
+
+
+class FFmpegSessionCleanupTests(unittest.TestCase):
+    def _session(self, root: Path, session_id: str = "abcdef1234"):
+        session_dir = root / "sessions" / session_id
+        records_dir = root / "records" / "model"
+        session_dir.mkdir(parents=True)
+        records_dir.mkdir(parents=True)
+        return FFmpegSession(
+            session_id=session_id,
+            input_url="https://example.test/live.m3u8",
+            sessions_dir=str(session_dir),
+            records_dir_for_person=str(records_dir),
+            person="model",
+        )
+
+    def test_completed_recording_removes_hls_session_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager = FFmpegManager(str(root))
+            session = self._session(root)
+            (Path(session.sessions_dir) / "stream.m3u8").write_text("#EXTM3U")
+            (Path(session.sessions_dir) / "seg_000001.ts").write_bytes(b"segment")
+            Path(session.record_path).write_bytes(b"recording")
+            session.bytes_written = len(b"recording")
+
+            self.assertTrue(manager._cleanup_session_dir(session))
+            self.assertFalse(Path(session.sessions_dir).exists())
+            self.assertTrue(Path(session.record_path).exists())
+
+    def test_failed_recording_keeps_hls_session_directory_for_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager = FFmpegManager(str(root))
+            session = self._session(root)
+            log_path = Path(session.log_path)
+            log_path.write_text("ffmpeg failure")
+
+            self.assertFalse(manager._cleanup_session_dir(session))
+            self.assertTrue(log_path.exists())
+
+    def test_cleanup_refuses_session_directory_outside_sessions_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager = FFmpegManager(str(root / "managed"))
+            outside = root / "outside"
+            session = self._session(outside)
+            Path(session.record_path).write_bytes(b"recording")
+            session.bytes_written = len(b"recording")
+
+            self.assertFalse(manager._cleanup_session_dir(session))
+            self.assertTrue(Path(session.sessions_dir).exists())
 
 
 if __name__ == "__main__":

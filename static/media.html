@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/loader.js"></script>
-  <script defer src="/static/media.js?v=10"></script>
+  <script defer src="/static/media.js?v=11"></script>
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -41,6 +41,11 @@
           <div class="media-section-subtitle" id="mediaProfileMeta">Loading...</div>
         </div>
         <div class="media-carousel-actions">
+          <select id="mediaAutoRecordFilter" class="media-select" aria-label="Auto-record profile filter">
+            <option value="all">All auto-record states</option>
+            <option value="enabled">Auto-record enabled</option>
+            <option value="disabled">Auto-record disabled</option>
+          </select>
           <button class="media-action-btn primary" id="mediaNewProfileBtn" type="button">New profile</button>
           <button class="media-carousel-btn" id="mediaProfilePrev" type="button" title="Previous" aria-label="Previous profiles">&#8592;</button>
           <button class="media-carousel-btn" id="mediaProfileNext" type="button" title="Next" aria-label="Next profiles">&#8594;</button>

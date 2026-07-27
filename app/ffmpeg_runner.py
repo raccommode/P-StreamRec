@@ -1,4 +1,5 @@
 import os
+import shutil
 import uuid
 import threading
 import subprocess
@@ -724,18 +725,79 @@ class FFmpegManager:
             sess.completed_monotonic = time.time()
             sess.completed_at = sess.completed_at or (datetime.utcnow().isoformat() + "Z")
 
+    def _cleanup_session_dir(self, sess: FFmpegSession) -> bool:
+        writer = sess._writer_thread
+        if writer and writer.is_alive():
+            logger.warning(
+                "Nettoyage session HLS reporté: writer actif",
+                session_id=sess.id,
+                person=sess.person,
+            )
+            return False
+
+        has_recording = False
+        for path in sess._recording_paths_for_cleanup():
+            try:
+                if os.path.isfile(path) and os.path.getsize(path) > 0:
+                    has_recording = True
+                    break
+            except OSError:
+                continue
+        if sess.bytes_written <= 0 or not has_recording:
+            logger.info(
+                "Répertoire session HLS conservé pour diagnostic",
+                session_id=sess.id,
+                person=sess.person,
+                bytes_written=sess.bytes_written,
+            )
+            return False
+
+        sessions_root = os.path.realpath(self.sessions_root)
+        session_dir = os.path.realpath(sess.sessions_dir)
+        if os.path.dirname(session_dir) != sessions_root:
+            logger.error(
+                "Nettoyage session HLS refusé hors racine",
+                session_id=sess.id,
+                session_dir=session_dir,
+                sessions_root=sessions_root,
+            )
+            return False
+
+        try:
+            if os.path.isdir(session_dir):
+                shutil.rmtree(session_dir)
+                logger.info(
+                    "Répertoire session HLS supprimé",
+                    session_id=sess.id,
+                    person=sess.person,
+                    path=session_dir,
+                )
+            return True
+        except OSError as exc:
+            logger.warning(
+                "Échec nettoyage répertoire session HLS",
+                session_id=sess.id,
+                person=sess.person,
+                path=session_dir,
+                error=str(exc),
+            )
+            return False
+
     def _prune_finished_locked(self) -> int:
         pruned = 0
         for session_id, sess in list(self._sessions.items()):
             if sess.is_running():
                 continue
             self._finalize_session_locked(sess)
+            if sess._writer_thread and sess._writer_thread.is_alive():
+                continue
             if (
                 sess.bytes_written > 0
                 and sess.completed_monotonic is not None
                 and time.time() - sess.completed_monotonic < _FINISHED_SESSION_GRACE_SECONDS
             ):
                 continue
+            self._cleanup_session_dir(sess)
             self._sessions.pop(session_id, None)
             pruned += 1
             logger.info(
@@ -798,7 +860,16 @@ class FFmpegManager:
                           session_id=session_id, 
                           person=sess.person,
                           duration_seconds=f"{duration:.1f}")
-            self._sessions.pop(session_id, None)
+            writer_active = bool(sess._writer_thread and sess._writer_thread.is_alive())
+            if not writer_active:
+                self._cleanup_session_dir(sess)
+                self._sessions.pop(session_id, None)
+            else:
+                logger.warning(
+                    "Session FFmpeg conservée jusqu'à la fin du writer",
+                    session_id=session_id,
+                    person=sess.person,
+                )
             return True
 
     def stalled_session_ids(self, max_idle_seconds: Optional[int] = None) -> List[str]:

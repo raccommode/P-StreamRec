@@ -11,6 +11,7 @@
     kind: 'video',
     selectedProfile: '',
     filterProfile: '',
+    autoRecordFilter: 'all',
     search: '',
     sort: 'newest',
     loading: false,
@@ -301,6 +302,16 @@
     return !!(username && profileByUsername(username));
   }
 
+  function visibleProfiles() {
+    if (state.autoRecordFilter === 'enabled') {
+      return state.profiles.filter(function(profile) { return !!profile.autoRecord; });
+    }
+    if (state.autoRecordFilter === 'disabled') {
+      return state.profiles.filter(function(profile) { return !profile.autoRecord; });
+    }
+    return state.profiles;
+  }
+
   function mediaCountLabel(count, singular, plural) {
     count = Number(count) || 0;
     return count + ' ' + (count === 1 ? singular : plural);
@@ -468,10 +479,14 @@
     var meta = $('mediaProfileMeta');
     if (!rail) return;
     var scrollLeft = rail.scrollLeft || 0;
+    var profiles = visibleProfiles();
 
     if (meta) {
-      var count = state.profiles.length;
-      meta.textContent = count === 1 ? '1 profile' : count + ' profiles';
+      var count = profiles.length;
+      var countLabel = count === 1 ? '1 profile' : count + ' profiles';
+      meta.textContent = state.autoRecordFilter === 'all'
+        ? countLabel
+        : countLabel + ' of ' + state.profiles.length;
     }
 
     if (!state.profiles.length) {
@@ -479,7 +494,12 @@
       return;
     }
 
-    rail.innerHTML = state.profiles.map(renderProfileCard).join('');
+    if (!profiles.length) {
+      rail.innerHTML = '<div class="empty-message"><div class="icon">&#128444;</div><p>No profiles match this filter</p></div>';
+      return;
+    }
+
+    rail.innerHTML = profiles.map(renderProfileCard).join('');
     if (scrollLeft) {
       requestAnimationFrame(function() {
         rail.scrollLeft = scrollLeft;
@@ -1466,6 +1486,9 @@
     var profileFilter = $('mediaProfileFilter');
     if (profileFilter) profileFilter.value = state.filterProfile || '';
 
+    var autoRecordFilter = $('mediaAutoRecordFilter');
+    if (autoRecordFilter) autoRecordFilter.value = state.autoRecordFilter;
+
     var unwatchedToggle = $('mediaUnwatchedOnlyToggle');
     if (unwatchedToggle) {
       unwatchedToggle.checked = !!state.unwatchedOnly;
@@ -1530,6 +1553,14 @@
     if (profileFilter) {
       profileFilter.addEventListener('change', function() {
         setFilterProfile(profileFilter.value);
+      });
+    }
+
+    var autoRecordFilter = $('mediaAutoRecordFilter');
+    if (autoRecordFilter) {
+      autoRecordFilter.addEventListener('change', function() {
+        state.autoRecordFilter = autoRecordFilter.value || 'all';
+        renderProfileCarousel();
       });
     }
 
