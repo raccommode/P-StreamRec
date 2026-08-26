@@ -1,18 +1,24 @@
-<header class="header">
-  <div class="header-left">
-    <div class="logo" onclick="window.location.href='/'" style="cursor: pointer;">🎬 P-StreamRec</div>
-    <span class="version" id="appVersion" title="Current version">
-      <span id="appVersionText">...</span>
-      <span class="version-update-dot" id="appUpdateBadge" hidden aria-hidden="true"></span>
-    </span>
-  </div>
-  <nav class="header-nav">
-    <a href="/discover" class="nav-link" data-page="discover">Discover</a>
-    <a href="/following" class="nav-link" data-page="following">Following</a>
-    <a href="/media" class="nav-link" data-page="media">Media</a>
-  </nav>
-  <div class="header-right" id="headerRight">
-    <button type="button" class="settings-btn" id="logoutBtn" title="Log out" hidden style="display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-primary); font-size: 18px; cursor: pointer; transition: all 0.3s;">&#x21AA;</button>
-    <a href="/settings" class="settings-btn" title="Settings" style="text-decoration: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-primary); font-size: 18px; cursor: pointer; transition: all 0.3s;">&#9881;</a>
-  </div>
-</header>
+<div class="shared-header-shell">
+  <aside class="project-status-banner" aria-label="Project status">
+    <span class="project-status-banner-icon" aria-hidden="true">&#9888;</span>
+    <span><strong>P-StreamRec is no longer maintained.</strong> This project has been replaced by <a href="https://github.com/raccommode/OpenEasyX" target="_blank" rel="noopener noreferrer">OpenEasyX</a>.</span>
+  </aside>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo" onclick="window.location.href='/'" style="cursor: pointer;">🎬 P-StreamRec</div>
+      <span class="version" id="appVersion" title="Current version">
+        <span id="appVersionText">...</span>
+        <span class="version-update-dot" id="appUpdateBadge" hidden aria-hidden="true"></span>
+      </span>
+    </div>
+    <nav class="header-nav">
+      <a href="/discover" class="nav-link" data-page="discover">Discover</a>
+      <a href="/following" class="nav-link" data-page="following">Following</a>
+      <a href="/media" class="nav-link" data-page="media">Media</a>
+    </nav>
+    <div class="header-right" id="headerRight">
+      <button type="button" class="settings-btn" id="logoutBtn" title="Log out" hidden style="display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-primary); font-size: 18px; cursor: pointer; transition: all 0.3s;">&#x21AA;</button>
+      <a href="/settings" class="settings-btn" title="Settings" style="text-decoration: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-primary); font-size: 18px; cursor: pointer; transition: all 0.3s;">&#9881;</a>
+    </div>
+  </header>
+</div>

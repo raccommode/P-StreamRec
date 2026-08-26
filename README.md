@@ -1,5 +1,8 @@
 # P-StreamRec
 
+> [!IMPORTANT]
+> **P-StreamRec is no longer maintained.** This project has been replaced by [OpenEasyX](https://github.com/raccommode/OpenEasyX).
+
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-green.svg)](https://github.com/raccommode/P-StreamRec)

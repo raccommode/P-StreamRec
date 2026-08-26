@@ -47,6 +47,19 @@ class SettingsStaticTests(unittest.TestCase):
         self.assertIn("data.authentication_required", loader)
         self.assertIn("fetch('/api/logout', { method: 'POST' })", loader)
 
+    def test_shared_header_warns_that_project_was_replaced(self):
+        header = (ROOT / "static" / "header.html").read_text()
+        css = (ROOT / "static" / "styles.css").read_text()
+        readme = (ROOT / "README.md").read_text()
+        replacement_url = "https://github.com/raccommode/OpenEasyX"
+
+        self.assertIn('class="project-status-banner"', header)
+        self.assertIn("P-StreamRec is no longer maintained.", header)
+        self.assertIn(replacement_url, header)
+        self.assertIn(".project-status-banner", css)
+        self.assertIn("P-StreamRec is no longer maintained.", readme)
+        self.assertIn(replacement_url, readme)
+
     def test_settings_application_tab_is_removed(self):
         html = (ROOT / "static" / "settings.html").read_text()
         js = (ROOT / "static" / "settings.js").read_text()

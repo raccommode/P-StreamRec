@@ -78,6 +78,47 @@ body::before {
    HEADER
    ============================================ */
 
+.shared-header-shell {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.project-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.7rem 1.25rem;
+  color: #fef3c7;
+  background: linear-gradient(90deg, #78350f 0%, #92400e 50%, #78350f 100%);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.24);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.project-status-banner-icon {
+  flex: 0 0 auto;
+  color: #fbbf24;
+  font-size: 1.05rem;
+}
+
+.project-status-banner a {
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.project-status-banner a:hover,
+.project-status-banner a:focus-visible {
+  color: #fde68a;
+}
+
 .header {
   background: var(--bg-glass);
   backdrop-filter: blur(20px) saturate(180%);
@@ -87,9 +128,8 @@ body::before {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+  position: relative;
+  z-index: 1;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   transition: all var(--transition-normal);
 }
@@ -1304,6 +1344,13 @@ button {
 
 /* Mobile */
 @media (max-width: 768px) {
+  .project-status-banner {
+    align-items: flex-start;
+    padding: 0.65rem 1rem;
+    font-size: 0.82rem;
+    text-align: left;
+  }
+
   .header {
     padding: 1rem 1.5rem;
   }
